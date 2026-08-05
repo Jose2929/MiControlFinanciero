@@ -1,4 +1,8 @@
-const CACHE_NAME = 'mcf-cache-v1'
+// Sube este número en cada deploy que necesite forzar a los navegadores a
+// descartar assets viejos en caché (p.ej. si el build anterior quedó con
+// config rota) — el activate de abajo borra cualquier caché con nombre
+// distinto al actual.
+const CACHE_NAME = 'mcf-cache-v2'
 
 const APP_SHELL = [
   './',

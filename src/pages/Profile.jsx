@@ -15,6 +15,7 @@ import {
   Copy,
   UserPlus,
   RefreshCw,
+  Scale,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -26,8 +27,9 @@ import { Input } from '../components/ui/Input'
 import { Toggle } from '../components/ui/Toggle'
 import { Avatar } from '../components/ui/Avatar'
 import { IncomeProfileModal } from '../components/modals/IncomeProfileModal'
+import { AdjustBalanceModal } from '../components/modals/AdjustBalanceModal'
 import { ICON_LIBRARY, CUSTOM_CATEGORY_SWATCHES } from '../lib/categories'
-import { formatFullDate } from '../lib/format'
+import { formatFullDate, formatShortDate, formatSignedMoney } from '../lib/format'
 import { cn } from '../lib/cn'
 
 function AddCategoryForm({ onAdd, onCancel }) {
@@ -249,6 +251,63 @@ function HouseholdCard() {
           <span>{feedback.text}</span>
         </div>
       )}
+    </Card>
+  )
+}
+
+// Ajustar saldo: corrige cuánto tienes en una cuenta para partir de un punto
+// realista (p.ej. arrancar a medio mes con el ingreso ya recibido y gastado).
+// Las transacciones 'adjustment' no aparecen en Ingresos ni Gastos (que
+// filtran por tipo exacto), así que se listan aquí para no perderles el
+// rastro.
+function AdjustBalanceCard() {
+  const { transactions, accounts } = useFinance()
+  const [open, setOpen] = useState(false)
+
+  const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
+  const adjustments = transactions.filter((t) => t.type === 'adjustment').sort((a, b) => b.date - a.date)
+
+  return (
+    <Card className="p-5">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Scale className="h-4 w-4 text-brand-400" />
+          <h2 className="text-sm font-semibold text-ink">Ajustar saldo</h2>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Ajustar
+        </Button>
+      </div>
+      <p className="mb-3 text-xs text-muted">
+        Corrige cuánto tienes en una cuenta ahora mismo — útil para arrancar a medio mes cuando el ingreso ya
+        llegó y en parte ya se gastó.
+      </p>
+
+      {adjustments.length > 0 && (
+        <ul className="divide-y divide-line">
+          {adjustments.map((tx) => (
+            <li key={tx.id} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-ink">{tx.note}</p>
+                <p className="text-xs text-muted">
+                  {accountMap[tx.accountId]?.name || 'Cuenta eliminada'} · {formatShortDate(tx.date)}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  'shrink-0 font-semibold tabular-nums',
+                  tx.amount >= 0 ? 'text-positive' : 'text-negative'
+                )}
+              >
+                {formatSignedMoney(tx.amount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <AdjustBalanceModal open={open} onClose={() => setOpen(false)} />
     </Card>
   )
 }
@@ -558,6 +617,8 @@ export default function Profile() {
           />
         )}
       </Card>
+
+      <AdjustBalanceCard />
 
       <DataBackupCard />
 

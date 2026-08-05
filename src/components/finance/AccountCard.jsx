@@ -1,18 +1,22 @@
-import { Wifi, Wallet } from 'lucide-react'
+import { Wifi, Wallet, PiggyBank } from 'lucide-react'
 import { formatMoney, formatPercent } from '../../lib/format'
 import { ProgressBar } from '../ui/ProgressBar'
+import { Button } from '../ui/Button'
 import { cn } from '../../lib/cn'
 
 const TYPE_LABEL = {
   credito: 'Crédito',
   debito: 'Débito',
   efectivo: 'Efectivo',
+  ahorro: 'Ahorro',
 }
 
-export function AccountCard({ account }) {
+export function AccountCard({ account, onRegisterMovement }) {
   const isCredit = account.type === 'credito'
+  const isSavings = account.type === 'ahorro'
   const utilization = isCredit && account.limit > 0 ? (account.used / account.limit) * 100 : 0
   const status = utilization > 90 ? 'danger' : utilization > 70 ? 'warning' : 'ok'
+  const goalPercent = isSavings && account.goal > 0 ? Math.min((account.balance / account.goal) * 100, 100) : 0
 
   return (
     <div
@@ -28,7 +32,9 @@ export function AccountCard({ account }) {
           <p className="text-sm font-medium text-white/80">{account.name}</p>
           <p className="text-xs text-white/60">{TYPE_LABEL[account.type]}</p>
         </div>
-        {account.type === 'efectivo' ? (
+        {isSavings ? (
+          <PiggyBank className="h-6 w-6 text-white/70" />
+        ) : account.type === 'efectivo' ? (
           <Wallet className="h-6 w-6 text-white/70" />
         ) : (
           <Wifi className="h-6 w-6 rotate-90 text-white/70" />
@@ -52,6 +58,31 @@ export function AccountCard({ account }) {
             <p className="mt-1.5 text-xs text-white/60">
               Límite {formatMoney(account.limit)} · Disponible {formatMoney(account.limit - account.used)}
             </p>
+          </div>
+        ) : isSavings ? (
+          <div>
+            <p className="text-xs text-white/60">Ahorrado</p>
+            <p className="text-2xl font-bold tabular-nums">{formatMoney(account.balance)}</p>
+            {account.goal > 0 && (
+              <>
+                <div className="mt-1.5">
+                  <ProgressBar percent={goalPercent} status="brand" trackClassName="bg-white/20" />
+                </div>
+                <p className="mt-1.5 text-xs text-white/60">
+                  Meta {formatMoney(account.goal)} · {formatPercent(goalPercent)}
+                </p>
+              </>
+            )}
+            {onRegisterMovement && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2 w-full bg-white/15 text-white hover:bg-white/25"
+                onClick={() => onRegisterMovement(account)}
+              >
+                Registrar movimiento
+              </Button>
+            )}
           </div>
         ) : (
           <div>

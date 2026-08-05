@@ -274,7 +274,15 @@ export function FinanceProvider({ children, store: providedStore }) {
     () => sumBy(monthTransactions, 'debt_payment'),
     [monthTransactions]
   )
-  const available = monthIncome - monthExpenses - monthDebtPayments
+  // Ajustes manuales de saldo (p.ej. "ya recibí y gasté el ingreso de este
+  // mes antes de empezar a registrar") — su monto va firmado, así que sumBy
+  // ya los suma/resta correctamente. Cuentan para "Disponible" pero NO para
+  // monthIncome/monthIncomeBySource, que solo miran transacciones type='income'.
+  const monthAdjustments = useMemo(
+    () => sumBy(monthTransactions, 'adjustment'),
+    [monthTransactions]
+  )
+  const available = monthIncome - monthExpenses - monthDebtPayments + monthAdjustments
 
   const monthIncomeBySource = useMemo(() => {
     const totals = new Map()
@@ -291,6 +299,11 @@ export function FinanceProvider({ children, store: providedStore }) {
 
   const totalDebt = useMemo(() => debts.reduce((s, d) => s + d.remainingBalance, 0), [debts])
   const prevTotalDebt = totalDebt + monthDebtPayments // approx: debt before this month's payments
+
+  const totalSavings = useMemo(
+    () => accounts.filter((a) => a.type === 'ahorro').reduce((s, a) => s + (a.balance || 0), 0),
+    [accounts]
+  )
 
   // -- Spend by category (current month, expenses only) ------------------
   const spendByCategory = useMemo(() => {
@@ -575,9 +588,80 @@ export function FinanceProvider({ children, store: providedStore }) {
       ...(account.type === 'credito'
         ? { used: Number(account.used) || 0, limit: Number(account.limit) || 0 }
         : { balance: Number(account.balance) || 0 }),
+      ...(account.type === 'ahorro' && account.goal ? { goal: Number(account.goal) || 0 } : {}),
     }
     setAccounts((prev) => [...prev, acc])
     return acc
+  }, [])
+
+  // Mueve dinero hacia (depósito) o desde (retiro) una cuenta de ahorro. Es
+  // una transacción propia (`saving_movement`), no un ingreso ni un gasto —
+  // así no distorsiona monthIncome/monthExpenses, igual que ya pasa con los
+  // pagos de deuda.
+  const registerSavingMovement = useCallback(
+    ({ accountId, counterAccountId, amount, direction, note, date }) => {
+      const value = Number(amount)
+      const isDeposit = direction !== 'retiro'
+
+      setAccounts((prev) =>
+        prev.map((acc) => {
+          if (acc.id === accountId) {
+            return { ...acc, balance: isDeposit ? acc.balance + value : acc.balance - value }
+          }
+          if (counterAccountId && acc.id === counterAccountId) {
+            if (isDeposit) {
+              // El dinero sale de la cuenta contraparte, igual que un gasto.
+              if (acc.type === 'credito') return { ...acc, used: acc.used + value }
+              return { ...acc, balance: acc.balance - value }
+            }
+            // Retiro: el dinero entra a la cuenta contraparte, igual que un ingreso.
+            if (acc.type === 'credito') return acc
+            return { ...acc, balance: acc.balance + value }
+          }
+          return acc
+        })
+      )
+
+      const tx = {
+        id: nextLocalId('sav'),
+        type: 'saving_movement',
+        accountId,
+        counterAccountId: counterAccountId || null,
+        amount: value,
+        direction: isDeposit ? 'deposito' : 'retiro',
+        note: note?.trim() || (isDeposit ? 'Depósito a ahorro' : 'Retiro de ahorro'),
+        date: date ? new Date(date) : new Date(),
+      }
+      setTransactions((prev) => [tx, ...prev])
+      return tx
+    },
+    []
+  )
+
+  // Corrige el saldo de una cuenta (débito/efectivo) para "partir de un punto
+  // realista" — p.ej. empezar a medio mes con el ingreso ya recibido y
+  // gastado sin registrar cada transacción. Es su propia transacción
+  // (`adjustment`, monto firmado) que sí cuenta para "Disponible este mes"
+  // pero no para monthIncome — así no se infla el ingreso real ni su
+  // desglose por fuente.
+  const addBalanceAdjustment = useCallback(({ accountId, amount, direction, note, date }) => {
+    const magnitude = Number(amount)
+    const signedAmount = direction === 'decrease' ? -magnitude : magnitude
+
+    setAccounts((prev) =>
+      prev.map((acc) => (acc.id === accountId ? { ...acc, balance: acc.balance + signedAmount } : acc))
+    )
+
+    const tx = {
+      id: nextLocalId('adj'),
+      type: 'adjustment',
+      accountId,
+      amount: signedAmount,
+      note: note?.trim() || 'Ajuste de saldo',
+      date: date ? new Date(date) : new Date(),
+    }
+    setTransactions((prev) => [tx, ...prev])
+    return tx
   }, [])
 
   const registerDebtPayment = useCallback((debtId, amount, accountId) => {
@@ -763,12 +847,14 @@ export function FinanceProvider({ children, store: providedStore }) {
     monthIncome,
     monthExpenses,
     monthDebtPayments,
+    monthAdjustments,
     available,
     monthIncomeBySource,
     prevMonthIncome,
     prevMonthExpenses,
     totalDebt,
     prevTotalDebt,
+    totalSavings,
     spendByCategory,
     trend6Months,
     upcomingPayments,
@@ -797,6 +883,8 @@ export function FinanceProvider({ children, store: providedStore }) {
     convertExpenseToMSI,
     addAccount,
     registerDebtPayment,
+    registerSavingMovement,
+    addBalanceAdjustment,
     upsertBudget,
     addCategory,
     removeCategory,

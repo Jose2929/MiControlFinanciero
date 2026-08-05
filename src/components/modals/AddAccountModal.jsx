@@ -24,6 +24,7 @@ export function AddAccountModal({ open, onClose }) {
   const [balance, setBalance] = useState('')
   const [limit, setLimit] = useState('')
   const [used, setUsed] = useState('')
+  const [goal, setGoal] = useState('')
   const [gradient, setGradient] = useState(GRADIENTS[0].cls)
 
   function reset() {
@@ -34,6 +35,7 @@ export function AddAccountModal({ open, onClose }) {
     setBalance('')
     setLimit('')
     setUsed('')
+    setGoal('')
     setGradient(GRADIENTS[0].cls)
   }
 
@@ -50,9 +52,10 @@ export function AddAccountModal({ open, onClose }) {
       bank: bank.trim() || null,
       type,
       last4: type === 'efectivo' ? null : last4.trim() || null,
-      balance: type === 'efectivo' || type === 'debito' ? Number(balance) || 0 : undefined,
+      balance: type !== 'credito' ? Number(balance) || 0 : undefined,
       limit: type === 'credito' ? Number(limit) || 0 : undefined,
       used: type === 'credito' ? Number(used) || 0 : undefined,
+      goal: type === 'ahorro' ? Number(goal) || 0 : undefined,
       gradient,
     })
     handleClose()
@@ -74,6 +77,7 @@ export function AddAccountModal({ open, onClose }) {
             <option value="debito">Débito</option>
             <option value="credito">Crédito</option>
             <option value="efectivo">Efectivo</option>
+            <option value="ahorro">Ahorro</option>
           </Select>
         </div>
 
@@ -93,7 +97,24 @@ export function AddAccountModal({ open, onClose }) {
             <Input label="Saldo usado" type="number" min="0" value={used} onChange={(e) => setUsed(e.target.value)} />
           </div>
         ) : (
-          <Input label="Saldo disponible" type="number" min="0" value={balance} onChange={(e) => setBalance(e.target.value)} />
+          <Input
+            label={type === 'ahorro' ? 'Saldo actual' : 'Saldo disponible'}
+            type="number"
+            min="0"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+          />
+        )}
+
+        {type === 'ahorro' && (
+          <Input
+            label="Meta de ahorro (opcional)"
+            type="number"
+            min="0"
+            placeholder="Ej. 30000"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+          />
         )}
 
         <div>

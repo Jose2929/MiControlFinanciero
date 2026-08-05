@@ -107,6 +107,13 @@ export function getIconById(id) {
   return ICON_LIBRARY.find((i) => i.id === id)?.icon || Tag
 }
 
+// Reverse de getIconById: dado el componente de icono, devuelve su id string
+// (para serializar categorías personalizadas). Respaldo cuando el objeto no
+// trae ya un `iconId`.
+export function getIconId(icon) {
+  return ICON_LIBRARY.find((i) => i.icon === icon)?.id || 'Tag'
+}
+
 export const CUSTOM_CATEGORY_SWATCHES = [
   '#0EA5E9',
   '#F472B6',

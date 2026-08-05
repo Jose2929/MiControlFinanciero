@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Wallet2, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -10,22 +10,31 @@ import { GoogleIcon } from '../components/GoogleIcon'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { signIn, signInWithGoogle, register, pendingProvider } = useAuth()
+  const { signIn, signInWithGoogle, register, pendingProvider, error } = useAuth()
   const [mode, setMode] = useState('signin')
-  const [email, setEmail] = useState('jmrm.2929@gmail.com')
-  const [password, setPassword] = useState('••••••••')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (mode === 'signin') await signIn()
-    else await register()
-    navigate('/dashboard')
+    try {
+      if (mode === 'signin') await signIn(email, password)
+      else await register(email, password, name)
+      navigate('/dashboard')
+    } catch {
+      // el mensaje de error ya queda expuesto por useAuth().error
+    }
   }
 
   async function handleGoogle() {
-    await signInWithGoogle()
-    navigate('/dashboard')
+    try {
+      await signInWithGoogle()
+      navigate('/dashboard')
+    } catch {
+      // el mensaje de error ya queda expuesto por useAuth().error
+    }
   }
 
   return (
@@ -55,7 +64,26 @@ export default function Login() {
             onChange={setMode}
           />
 
+          {error && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-negative-soft px-3 py-2.5 text-sm text-negative">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
+              <Input
+                label="Nombre"
+                type="text"
+                icon={User}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Tu nombre"
+                autoComplete="name"
+                required
+              />
+            )}
             <Input
               label="Correo electrónico"
               type="email"
@@ -64,6 +92,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tucorreo@ejemplo.com"
               autoComplete="email"
+              required
             />
             <div>
               <div className="relative">
@@ -73,8 +102,10 @@ export default function Login() {
                   icon={Lock}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   className="pr-10"
+                  minLength={6}
+                  required
                 />
                 <button
                   type="button"
@@ -125,10 +156,6 @@ export default function Login() {
             Continuar con Google
           </Button>
         </Card>
-
-        <p className="mt-6 text-center text-xs text-muted">
-          Interfaz de demostración con datos de ejemplo — sin conexión a servicios reales.
-        </p>
       </div>
     </div>
   )

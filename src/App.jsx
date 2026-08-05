@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Wallet2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { HouseholdProvider, useHousehold } from './context/HouseholdContext'
 import { FinanceProvider } from './context/FinanceContext'
 import { AppShell } from './components/layout/AppShell'
 import Login from './pages/Login'
@@ -27,8 +28,10 @@ function SplashScreen() {
 
 function RequireAuth({ children }) {
   const { status, isAuthenticated } = useAuth()
+  const { householdId, loading: householdLoading } = useHousehold()
   if (status === 'checking') return <SplashScreen />
   if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (householdLoading || !householdId) return <SplashScreen />
   return children
 }
 
@@ -79,7 +82,9 @@ export default function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <AppRoutes />
+        <HouseholdProvider>
+          <AppRoutes />
+        </HouseholdProvider>
       </AuthProvider>
     </HashRouter>
   )

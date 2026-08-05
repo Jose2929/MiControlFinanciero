@@ -1,0 +1,43 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "inviteCodes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && newData.child('householdId').val() != null && root.child('households/' + newData.child('householdId').val() + '/members/' + auth.uid + '/role').val() === 'owner'"
+      }
+    },
+    "households": {
+      "$hid": {
+        "meta": {
+          ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
+          ".write": "auth != null && (!data.exists() || root.child('households/' + $hid + '/members/' + auth.uid + '/role').val() === 'owner')"
+        },
+        "inviteCode": {
+          ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
+          ".write": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid + '/role').val() === 'owner'"
+        },
+        "members": {
+          "$uid": {
+            ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
+            ".write": "auth != null && auth.uid === $uid && (data.exists() || root.child('households/' + $hid + '/meta/createdBy').val() === auth.uid || root.child('households/' + $hid + '/inviteCode').val() === root.child('households/' + $hid + '/joinCodeUsed/' + auth.uid).val())"
+          }
+        },
+        "joinCodeUsed": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "profile": {
+          ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
+          ".write": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()"
+        }
+      }
+    }
+  }
+}

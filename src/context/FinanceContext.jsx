@@ -1,15 +1,12 @@
-import { createContext, useContext, useMemo, useState, useCallback } from 'react'
-import {
-  ACCOUNTS,
-  TRANSACTIONS,
-  DEBTS,
-  BUDGETS,
-  STATIC_NOTIFICATIONS,
-  INCOME_PROFILES_CONFIG,
-  RECURRING_BILLS,
-  RECURRING_CONFIRMATIONS,
-} from '../data/mockData'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { ref, get, set, onValue } from 'firebase/database'
+import { STATIC_NOTIFICATIONS } from '../data/mockData'
 import { CATEGORIES, getCategory, getIconById } from '../lib/categories'
+import { serializeProfile, deserializeProfile } from '../lib/profileSchema'
+import { createFirebaseRealtimeStore } from '../lib/profileStore'
+import { db } from '../lib/firebase'
+import { useAuth } from './AuthContext'
+import { useHousehold } from './HouseholdContext'
 import {
   isInMonth,
   monthStart,
@@ -27,17 +24,220 @@ const FinanceContext = createContext(null)
 
 let localIdCounter = 1000
 const nextLocalId = (prefix) => `${prefix}-${(localIdCounter += 1)}`
+const getIdCounter = () => localIdCounter
+// Al rehidratar un perfil guardado subimos el contador por encima del último
+// id usado para que los ids nuevos no colisionen con los restaurados.
+const bumpIdCounter = (n) => {
+  if (Number.isFinite(n) && n > localIdCounter) localIdCounter = n
+}
 
-export function FinanceProvider({ children }) {
-  const [accounts, setAccounts] = useState(ACCOUNTS)
-  const [transactions, setTransactions] = useState(TRANSACTIONS)
-  const [debts, setDebts] = useState(DEBTS)
-  const [budgets, setBudgets] = useState(BUDGETS)
+export function FinanceProvider({ children, store: providedStore }) {
+  const { user: authUser } = useAuth()
+  const { householdId } = useHousehold()
+
+  // Un hogar real siempre arranca limpio (sin el dataset de ejemplo).
+  const [accounts, setAccounts] = useState([])
+  const [transactions, setTransactions] = useState([])
+  const [debts, setDebts] = useState([])
+  const [budgets, setBudgets] = useState([])
   const [customCategories, setCustomCategories] = useState([])
-  const [readIds, setReadIds] = useState(() => new Set(['note-welcome', 'note-summary']))
-  const [incomeProfiles, setIncomeProfiles] = useState(INCOME_PROFILES_CONFIG)
-  const [recurringBills, setRecurringBills] = useState(RECURRING_BILLS)
-  const [recurringConfirmations, setRecurringConfirmations] = useState(RECURRING_CONFIRMATIONS)
+  const [readIds, setReadIds] = useState(() => new Set())
+  const [incomeProfiles, setIncomeProfiles] = useState([])
+  const [recurringBills, setRecurringBills] = useState([])
+  const [recurringConfirmations, setRecurringConfirmations] = useState([])
+
+  // -- Persistencia (Firebase RTDB, guardado manual + lectura en vivo) ----
+  // El adaptador apunta a households/{householdId}/profile — el nodo
+  // compartido del hogar (ver src/lib/household.js). Se puede inyectar un
+  // adaptador distinto (p.ej. en pruebas) vía la prop `store`.
+  const store = useMemo(() => {
+    if (providedStore) return providedStore
+    if (!householdId) return null
+    return createFirebaseRealtimeStore({ db, ref, get, set, onValue, id: householdId })
+  }, [providedStore, householdId])
+
+  const [hydrated, setHydrated] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error | conflict
+  const [lastSavedAt, setLastSavedAt] = useState(null)
+  const [remoteAhead, setRemoteAhead] = useState(false)
+
+  // Refs de coordinación entre el listener remoto y el guardado local:
+  const dirtyRef = useRef(false) // espejo de `dirty`, legible dentro del callback de subscribe
+  const remoteApplyRef = useRef(false) // true mientras aplicamos datos remotos (no cuenta como edición del usuario)
+  const dirtyGuard = useRef(false) // salta el primer "cambio" justo después de hidratar
+  const pendingRemoteRef = useRef(null) // snapshot remoto más nuevo que no se aplicó por haber ediciones locales
+
+  useEffect(() => {
+    dirtyRef.current = dirty
+  }, [dirty])
+
+  // Reemplaza todos los slices del estado con los de un perfil deserializado.
+  // `remote: true` indica que viene del listener de Firebase (no cuenta como
+  // edición del usuario para el tracking de "cambios sin guardar").
+  const applyProfile = useCallback((data, { remote = false } = {}) => {
+    if (!data) return
+    if (remote) remoteApplyRef.current = true
+    setAccounts(data.accounts)
+    setTransactions(data.transactions)
+    setDebts(data.debts)
+    setBudgets(data.budgets)
+    setCustomCategories(data.customCategories)
+    setIncomeProfiles(data.incomeProfiles)
+    setRecurringBills(data.recurringBills)
+    setRecurringConfirmations(data.recurringConfirmations)
+    setReadIds(data.readIds)
+    bumpIdCounter(data.idCounter)
+  }, [])
+
+  // Snapshot del estado actual como árbol serializable (para guardar/exportar).
+  const buildSnapshot = useCallback(
+    () =>
+      serializeProfile({
+        accounts,
+        transactions,
+        debts,
+        budgets,
+        customCategories,
+        incomeProfiles,
+        recurringBills,
+        recurringConfirmations,
+        readIds,
+        idCounter: getIdCounter(),
+        user: authUser,
+        updatedAt: new Date(),
+      }),
+    [
+      accounts,
+      transactions,
+      debts,
+      budgets,
+      customCategories,
+      incomeProfiles,
+      recurringBills,
+      recurringConfirmations,
+      readIds,
+      authUser,
+    ]
+  )
+
+  // Lectura en vivo: cada cambio que guarda cualquier miembro del hogar llega
+  // aquí. Si no hay ediciones locales sin guardar, se aplica directo. Si las
+  // hay, no se sobreescribe — se marca `remoteAhead` para avisar en la UI.
+  useEffect(() => {
+    if (!store) return
+
+    // Nuevo store (alta inicial o cambio de hogar): las ediciones locales
+    // previas ya no aplican a este árbol, así que se descartan para no
+    // bloquear la sincronización con un "conflicto" que no es tal.
+    dirtyGuard.current = false
+    pendingRemoteRef.current = null
+    setDirty(false)
+    setRemoteAhead(false)
+    setSaveState('idle')
+
+    const unsubscribe = store.subscribe((raw) => {
+      const data = raw ? deserializeProfile(raw) : null
+      if (data) {
+        if (!dirtyRef.current) {
+          applyProfile(data, { remote: true })
+          pendingRemoteRef.current = null
+          setRemoteAhead(false)
+          setLastSavedAt(data.updatedAt || null)
+        } else {
+          pendingRemoteRef.current = data
+          setRemoteAhead(true)
+        }
+      }
+      setHydrated(true)
+    })
+    return unsubscribe
+  }, [store, applyProfile])
+
+  // Marca "cambios sin guardar" cuando cambia cualquier slice serializable.
+  // Se ignoran: el primer render posterior a la hidratación (dirtyGuard) y
+  // los cambios que vinieron de aplicar un snapshot remoto (remoteApplyRef).
+  useEffect(() => {
+    if (!hydrated) return
+    if (remoteApplyRef.current) {
+      remoteApplyRef.current = false
+      return
+    }
+    if (!dirtyGuard.current) {
+      dirtyGuard.current = true
+      return
+    }
+    setDirty(true)
+    setSaveState('idle')
+  }, [
+    hydrated,
+    accounts,
+    transactions,
+    debts,
+    budgets,
+    customCategories,
+    incomeProfiles,
+    recurringBills,
+    recurringConfirmations,
+    readIds,
+  ])
+
+  // Guardado manual: persiste el snapshot completo vía el adaptador. Si un
+  // compañero de hogar guardó algo más reciente que no hemos absorbido, no
+  // sobreescribe solo — pasa a `saveState: 'conflict'` para que la UI
+  // ofrezca "recargar" o "sobrescribir" (force: true).
+  const saveProfile = useCallback(
+    async ({ force = false } = {}) => {
+      if (!store) throw new Error('Aún no hay un hogar listo para guardar.')
+      if (!force && pendingRemoteRef.current) {
+        setSaveState('conflict')
+        return null
+      }
+      setSaveState('saving')
+      try {
+        const snapshot = buildSnapshot()
+        await store.save(snapshot)
+        pendingRemoteRef.current = null
+        setRemoteAhead(false)
+        setDirty(false)
+        setLastSavedAt(new Date())
+        setSaveState('saved')
+        return snapshot
+      } catch (err) {
+        console.error('No se pudo guardar el perfil:', err)
+        setSaveState('error')
+        throw err
+      }
+    },
+    [buildSnapshot, store]
+  )
+
+  // Descarta las ediciones locales sin guardar y aplica el snapshot remoto
+  // pendiente — la otra mitad del diálogo de conflicto.
+  const discardLocalAndSyncRemote = useCallback(() => {
+    if (!pendingRemoteRef.current) return
+    applyProfile(pendingRemoteRef.current, { remote: true })
+    setLastSavedAt(pendingRemoteRef.current.updatedAt || null)
+    pendingRemoteRef.current = null
+    setRemoteAhead(false)
+    setDirty(false)
+    setSaveState('idle')
+  }, [applyProfile])
+
+  // Genera el JSON completo del perfil (string legible) para exportar/descargar.
+  const exportProfile = useCallback(() => JSON.stringify(buildSnapshot(), null, 2), [buildSnapshot])
+
+  // Recibe un JSON (objeto o string) y rehidrata todo el estado con él —
+  // cuenta como edición local: hay que presionar Guardar para persistirlo.
+  const importProfile = useCallback(
+    (input) => {
+      const data = deserializeProfile(input)
+      if (!data) throw new Error('El JSON del perfil no es válido')
+      applyProfile(data)
+      return data
+    },
+    [applyProfile]
+  )
 
   const allCategories = useMemo(() => [...CATEGORIES, ...customCategories], [customCategories])
 
@@ -537,6 +737,7 @@ export function FinanceProvider({ children }) {
     const cat = {
       id: nextLocalId('cat'),
       label: category.label,
+      iconId: category.icon, // el picker pasa el id string del icono
       icon: getIconById(category.icon),
       colorVar: null,
       color: category.color,
@@ -599,6 +800,17 @@ export function FinanceProvider({ children }) {
     upsertBudget,
     addCategory,
     removeCategory,
+
+    // Persistencia / respaldo del perfil
+    hydrated,
+    dirty,
+    saveState,
+    lastSavedAt,
+    remoteAhead,
+    saveProfile,
+    discardLocalAndSyncRemote,
+    exportProfile,
+    importProfile,
   }
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>

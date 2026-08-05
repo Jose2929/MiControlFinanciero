@@ -1,0 +1,113 @@
+@import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: 245 246 250;
+  --color-surface: 255 255 255;
+  --color-surface-2: 244 245 249;
+  --color-border: 230 232 240;
+  --color-text: 18 20 28;
+  --color-muted: 107 113 131;
+
+  /* Categorical palette (validated: dataviz skill, light surface #ffffff) */
+  --cat-comida: #2a78d6;
+  --cat-transporte: #eb6834;
+  --cat-renta: #1baf7a;
+  --cat-entretenimiento: #eda100;
+  --cat-salud: #e87ba4;
+  --cat-compras: #008300;
+  --cat-servicios: #4a3aa7;
+  --cat-otros: #e34948;
+  --cat-bebe: #0891b2;
+  --cat-mascotas: #a21caf;
+
+  /* Chart chrome */
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --chart-muted: #898781;
+}
+
+.dark {
+  --color-bg: 11 13 19;
+  --color-surface: 21 25 36;
+  --color-surface-2: 28 33 48;
+  --color-border: 35 40 56;
+  --color-text: 233 236 245;
+  --color-muted: 138 147 171;
+
+  /* Categorical palette (validated: dataviz skill, dark surface #151924) */
+  --cat-comida: #3987e5;
+  --cat-transporte: #d95926;
+  --cat-renta: #199e70;
+  --cat-entretenimiento: #c98500;
+  --cat-salud: #d55181;
+  --cat-compras: #008300;
+  --cat-servicios: #9085e9;
+  --cat-otros: #e66767;
+  --cat-bebe: #0891b2;
+  --cat-mascotas: #c026d3;
+
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --chart-muted: #898781;
+}
+
+* {
+  border-color: rgb(var(--color-border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: 'tnum' 1;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--color-border));
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Stagger helper: apply alongside animate-fade-in-up */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+.brand-gradient {
+  background-image: linear-gradient(135deg, #7c5cff 0%, #6d47f5 55%, #5936d6 100%);
+}
+
+.shimmer-bg {
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--color-surface-2)) 25%,
+    rgb(var(--color-border)) 37%,
+    rgb(var(--color-surface-2)) 63%
+  );
+  background-size: 400% 100%;
+}

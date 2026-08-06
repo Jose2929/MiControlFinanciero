@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
+import { Textarea } from '../ui/Textarea'
 import { Select } from '../ui/Select'
 import { useFinance } from '../../context/FinanceContext'
 
@@ -11,6 +12,7 @@ export function RecurringBillModal({ mode, onClose }) {
   const isEdit = mode?.type === 'edit'
 
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState(allCategories[0]?.id)
   const [estimatedAmount, setEstimatedAmount] = useState('')
   const [dueDay, setDueDay] = useState('1')
@@ -21,12 +23,14 @@ export function RecurringBillModal({ mode, onClose }) {
     if (isEdit) {
       const b = mode.bill
       setName(b.name)
+      setDescription(b.description || '')
       setCategoryId(b.categoryId)
       setEstimatedAmount(String(b.estimatedAmount))
       setDueDay(String(b.dueDay))
       setAccountId(b.accountId)
     } else {
       setName('')
+      setDescription('')
       setCategoryId(allCategories[0]?.id)
       setEstimatedAmount('')
       setDueDay('1')
@@ -42,6 +46,7 @@ export function RecurringBillModal({ mode, onClose }) {
     upsertRecurringBill({
       id: isEdit ? mode.bill.id : undefined,
       name: name.trim(),
+      description: description.trim(),
       categoryId,
       estimatedAmount: Number(estimatedAmount),
       dueDay: Math.min(Math.max(Number(dueDay) || 1, 1), 31),
@@ -53,7 +58,14 @@ export function RecurringBillModal({ mode, onClose }) {
   return (
     <Modal open={Boolean(mode)} onClose={onClose} title={isEdit ? 'Editar gasto recurrente' : 'Agregar gasto recurrente'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="Nombre" placeholder="Ej. Netflix" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input label="Nombre" placeholder="Ej. Streaming y membresías" value={name} onChange={(e) => setName(e.target.value)} required />
+
+        <Textarea
+          label="Descripción (opcional)"
+          placeholder="Ej. Netflix $139 + HBO Max $119.50 = $258.50"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
 
         <Select label="Categoría" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           {allCategories.map((c) => (

@@ -20,6 +20,7 @@ function pctDelta(current, previous) {
 
 export default function Dashboard() {
   const {
+    accounts,
     monthIncome,
     monthExpenses,
     monthDebtPayments,
@@ -46,6 +47,7 @@ export default function Dashboard() {
         debtPayments={monthDebtPayments}
         available={available}
         incomeBySource={monthIncomeBySource}
+        accounts={accounts}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
+import { AddCategoryForm } from '../finance/AddCategoryForm'
 import { useFinance } from '../../context/FinanceContext'
 
 // mode: { type: 'create' } | { type: 'edit', budget }
 export function BudgetModal({ mode, onClose }) {
-  const { allCategories, budgets, upsertBudget } = useFinance()
+  const { budgetableCategories, budgets, upsertBudget, removeBudget, addCategory } = useFinance()
   const isEdit = mode?.type === 'edit'
-  const availableCategories = allCategories.filter(
+  const availableCategories = budgetableCategories.filter(
     (c) => isEdit || !budgets.some((b) => b.categoryId === c.id)
   )
 
   const [categoryId, setCategoryId] = useState('')
   const [limit, setLimit] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
 
   useEffect(() => {
     if (!mode) return
+    setAddingCategory(false)
     if (isEdit) {
       setCategoryId(mode.budget.categoryId)
       setLimit(String(mode.budget.limit))
@@ -33,6 +37,11 @@ export function BudgetModal({ mode, onClose }) {
     e.preventDefault()
     if (!categoryId || !limit) return
     upsertBudget(categoryId, limit)
+    onClose()
+  }
+
+  function handleRemove() {
+    removeBudget(mode.budget.categoryId)
     onClose()
   }
 
@@ -52,6 +61,27 @@ export function BudgetModal({ mode, onClose }) {
           ))}
         </Select>
 
+        {!isEdit &&
+          (addingCategory ? (
+            <AddCategoryForm
+              onAdd={(cat) => {
+                const created = addCategory(cat)
+                setCategoryId(created.id)
+                setAddingCategory(false)
+              }}
+              onCancel={() => setAddingCategory(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingCategory(true)}
+              className="flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nueva categoría
+            </button>
+          ))}
+
         <Input
           label="Límite mensual"
           type="number"
@@ -64,6 +94,12 @@ export function BudgetModal({ mode, onClose }) {
         <Button type="submit" size="lg" className="w-full">
           Guardar presupuesto
         </Button>
+
+        {isEdit && (
+          <Button type="button" variant="ghost" size="lg" className="w-full text-negative" onClick={handleRemove}>
+            Eliminar presupuesto
+          </Button>
+        )}
       </form>
     </Modal>
   )

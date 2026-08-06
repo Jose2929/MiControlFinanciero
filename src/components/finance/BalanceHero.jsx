@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, HandCoins } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, HandCoins, Wallet } from 'lucide-react'
 import { formatMoney } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { ProgressBar } from '../ui/ProgressBar'
@@ -37,7 +37,7 @@ function Term({ icon: Icon, label, value, sign, sub }) {
   )
 }
 
-export function BalanceHero({ income, expenses, debtPayments, available, incomeBySource }) {
+export function BalanceHero({ income, expenses, debtPayments, available, incomeBySource, accounts }) {
   const incomeSub =
     incomeBySource && incomeBySource.length > 0
       ? incomeBySource.map((s) => `${s.label} ${formatMoney(s.amount)}`).join(' · ')
@@ -46,6 +46,11 @@ export function BalanceHero({ income, expenses, debtPayments, available, incomeB
   const used = expenses + debtPayments
   const usedPercent = income > 0 ? (used / income) * 100 : used > 0 ? 100 : 0
   const status = usageStatus(usedPercent)
+
+  // Saldo acumulado por cuenta de débito — es una cifra distinta a
+  // "Disponible este mes" (esa es flujo del mes, esta es el total en cada
+  // cuenta hoy), por eso va en su propia franja, claramente rotulada.
+  const debitAccounts = (accounts || []).filter((a) => a.type === 'debito')
 
   return (
     <div className="brand-gradient relative overflow-hidden rounded-2xl p-6 shadow-glow sm:p-8">
@@ -78,6 +83,31 @@ export function BalanceHero({ income, expenses, debtPayments, available, incomeB
           <Term icon={ArrowDownRight} label="Gastos" value={expenses} sign="−" />
           <Term icon={HandCoins} label="Pagos de deuda" value={debtPayments} sign="−" />
         </div>
+
+        {debitAccounts.length > 0 && (
+          <div className="mt-5 border-t border-white/15 pt-4">
+            <p className="mb-2.5 flex items-center gap-1.5 text-xs text-white/70">
+              <Wallet className="h-3.5 w-3.5" />
+              Saldo en cuentas de débito
+            </p>
+            <div className="mb-2.5 flex items-center justify-between rounded-lg bg-white/15 px-3 py-2.5">
+              <span className="text-xs font-semibold text-white/85">Fondo común (total)</span>
+              <span className="text-base font-bold tabular-nums text-white">
+                {formatMoney(debitAccounts.reduce((s, acc) => s + (acc.balance || 0), 0))}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {debitAccounts.map((acc) => (
+                <div key={acc.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/10 px-3 py-2">
+                  <span className="truncate text-xs font-medium text-white/85">{acc.name}</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-white">
+                    {formatMoney(acc.balance)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

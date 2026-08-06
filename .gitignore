@@ -34,6 +34,9 @@ firestore-debug.log*
 ui-debug.log*
 .firebaserc.local
 
+# Datos financieros reales usados para pruebas de importación — nunca a git
+import.json
+
 # Tests / coverage (Playwright u otros, si se corren dentro del repo)
 coverage
 test-results

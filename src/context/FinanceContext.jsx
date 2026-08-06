@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { ref, get, set, onValue } from 'firebase/database'
 import { STATIC_NOTIFICATIONS } from '../data/mockData'
-import { CATEGORIES, getCategory, getIconById } from '../lib/categories'
+import { CATEGORIES, getCategory, getIconById, GOAL_CATEGORIES, GOAL_CATEGORY_IDS } from '../lib/categories'
 import { serializeProfile, deserializeProfile } from '../lib/profileSchema'
 import { createFirebaseRealtimeStore } from '../lib/profileStore'
 import { db } from '../lib/firebase'
@@ -246,6 +246,19 @@ export function FinanceProvider({ children, store: providedStore }) {
     [allCategories]
   )
 
+  // Categorías de gasto + las 2 pseudo-categorías de meta (deuda/ahorro) —
+  // solo para el selector de presupuesto, NUNCA para categorizar un gasto
+  // real (por eso no se mezclan en `allCategories`).
+  const budgetableCategories = useMemo(
+    () => [...allCategories, ...GOAL_CATEGORIES],
+    [allCategories]
+  )
+
+  const findBudgetCategory = useCallback(
+    (id) => GOAL_CATEGORIES.find((c) => c.id === id) || findCategory(id),
+    [findCategory]
+  )
+
   const findIncomeProfile = useCallback(
     (id) => incomeProfiles.find((p) => p.id === id) || { id, label: 'Ingreso', mode: 'fixed' },
     [incomeProfiles]
@@ -305,6 +318,17 @@ export function FinanceProvider({ children, store: providedStore }) {
     [accounts]
   )
 
+  // Aportación neta a ahorro este mes (depósitos - retiros) — a diferencia de
+  // `totalSavings` (saldo acumulado histórico), esto es el avance del mes en
+  // curso, para comparar contra la meta mensual de ahorro.
+  const monthSavingsContribution = useMemo(
+    () =>
+      monthTransactions
+        .filter((t) => t.type === 'saving_movement')
+        .reduce((s, t) => s + (t.direction === 'retiro' ? -t.amount : t.amount), 0),
+    [monthTransactions]
+  )
+
   // -- Spend by category (current month, expenses only) ------------------
   const spendByCategory = useMemo(() => {
     const totals = new Map()
@@ -350,23 +374,77 @@ export function FinanceProvider({ children, store: providedStore }) {
   )
 
   // -- Budget progress -------------------------------------------------
+  // Superar una categoría de gasto es malo (getBudgetStatus: rojo >90%);
+  // superar una meta de deuda/ahorro es bueno — por eso las metas usan su
+  // propia escala de estado, invertida.
+  const getGoalStatus = (percent) => {
+    if (percent >= 90) return 'ok'
+    if (percent >= 40) return 'warning'
+    return 'brand'
+  }
+
   const budgetProgress = useMemo(() => {
     return budgets.map((b) => {
-      const spent = monthTransactions
-        .filter((t) => t.type === 'expense' && !t.convertedToMsi && t.categoryId === b.categoryId)
-        .reduce((s, t) => s + t.amount, 0)
+      const isGoal = GOAL_CATEGORY_IDS.has(b.categoryId)
+      let spent
+      if (b.categoryId === 'goal-debt-payment') spent = monthDebtPayments
+      else if (b.categoryId === 'goal-savings') spent = monthSavingsContribution
+      else {
+        spent = monthTransactions
+          .filter((t) => t.type === 'expense' && !t.convertedToMsi && t.categoryId === b.categoryId)
+          .reduce((s, t) => s + t.amount, 0)
+      }
       const percent = b.limit > 0 ? (spent / b.limit) * 100 : 0
       return {
         categoryId: b.categoryId,
-        category: findCategory(b.categoryId),
+        category: findBudgetCategory(b.categoryId),
+        isGoal,
         limit: b.limit,
         spent,
         percent: Math.min(percent, 999),
-        status: getBudgetStatus(percent),
+        status: isGoal ? getGoalStatus(percent) : getBudgetStatus(percent),
         remaining: Math.max(b.limit - spent, 0),
       }
     })
-  }, [budgets, monthTransactions, findCategory])
+  }, [budgets, monthTransactions, monthDebtPayments, monthSavingsContribution, findBudgetCategory])
+
+  // Versión histórica de budgetProgress para cualquier mes pasado (offset > 0
+  // meses atrás) — el límite mostrado es siempre el ACTUAL de cada categoría
+  // (los límites no se versionan por mes, se "repiten" automático), solo el
+  // gasto real cambia según el mes que se esté mirando. Usado por el selector
+  // de mes en Budgets.jsx; budgetProgress (offset 0) no se toca.
+  const getBudgetProgressForOffset = useCallback(
+    (offset) => {
+      const txs = transactions.filter((t) => isInMonth(t.date, offset))
+      const debtPayments = sumBy(txs, 'debt_payment')
+      const savings = txs
+        .filter((t) => t.type === 'saving_movement')
+        .reduce((s, t) => s + (t.direction === 'retiro' ? -t.amount : t.amount), 0)
+      return budgets.map((b) => {
+        const isGoal = GOAL_CATEGORY_IDS.has(b.categoryId)
+        let spent
+        if (b.categoryId === 'goal-debt-payment') spent = debtPayments
+        else if (b.categoryId === 'goal-savings') spent = savings
+        else {
+          spent = txs
+            .filter((t) => t.type === 'expense' && !t.convertedToMsi && t.categoryId === b.categoryId)
+            .reduce((s, t) => s + t.amount, 0)
+        }
+        const percent = b.limit > 0 ? (spent / b.limit) * 100 : 0
+        return {
+          categoryId: b.categoryId,
+          category: findBudgetCategory(b.categoryId),
+          isGoal,
+          limit: b.limit,
+          spent,
+          percent: Math.min(percent, 999),
+          status: isGoal ? getGoalStatus(percent) : getBudgetStatus(percent),
+          remaining: Math.max(b.limit - spent, 0),
+        }
+      })
+    },
+    [transactions, budgets, findBudgetCategory]
+  )
 
   // -- Recurring bills: configured once, confirmed manually every period ----
   const recurringStatus = useMemo(() => {
@@ -405,7 +483,10 @@ export function FinanceProvider({ children, store: providedStore }) {
       })
     })
     budgetProgress.forEach((b) => {
-      if (b.status === 'ok') return
+      // Las metas de deuda/ahorro no generan alertas de "presupuesto
+      // superado" — ahí superar el objetivo es buena noticia, y no haberlo
+      // alcanzado a medio mes no es urgente como sí lo es un gasto real.
+      if (b.isGoal || b.status === 'ok') return
       list.push({
         id: `alert-budget-${b.categoryId}`,
         kind: 'budget',
@@ -817,6 +898,10 @@ export function FinanceProvider({ children, store: providedStore }) {
     })
   }, [])
 
+  const removeBudget = useCallback((categoryId) => {
+    setBudgets((prev) => prev.filter((b) => b.categoryId !== categoryId))
+  }, [])
+
   const addCategory = useCallback((category) => {
     const cat = {
       id: nextLocalId('cat'),
@@ -841,6 +926,7 @@ export function FinanceProvider({ children, store: providedStore }) {
     debts,
     budgets,
     allCategories,
+    budgetableCategories,
     customCategories,
     findCategory,
 
@@ -855,10 +941,12 @@ export function FinanceProvider({ children, store: providedStore }) {
     totalDebt,
     prevTotalDebt,
     totalSavings,
+    monthSavingsContribution,
     spendByCategory,
     trend6Months,
     upcomingPayments,
     budgetProgress,
+    getBudgetProgressForOffset,
 
     incomeProfiles,
     findIncomeProfile,
@@ -886,6 +974,7 @@ export function FinanceProvider({ children, store: providedStore }) {
     registerSavingMovement,
     addBalanceAdjustment,
     upsertBudget,
+    removeBudget,
     addCategory,
     removeCategory,
 

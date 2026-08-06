@@ -33,6 +33,9 @@ export function RecurringBillCard({ status, category, onConfirm, onEdit, onRemov
             <p className="truncate text-xs text-muted">
               {category.label} · día {status.dueDay}
             </p>
+            {status.description && (
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted">{status.description}</p>
+            )}
           </div>
         </div>
         <Badge variant={confirmed ? 'positive' : URGENCY_VARIANT[status.urgency]} className="shrink-0">

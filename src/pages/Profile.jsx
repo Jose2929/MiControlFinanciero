@@ -28,80 +28,15 @@ import { Toggle } from '../components/ui/Toggle'
 import { Avatar } from '../components/ui/Avatar'
 import { IncomeProfileModal } from '../components/modals/IncomeProfileModal'
 import { AdjustBalanceModal } from '../components/modals/AdjustBalanceModal'
-import { ICON_LIBRARY, CUSTOM_CATEGORY_SWATCHES } from '../lib/categories'
+import { AddCategoryForm } from '../components/finance/AddCategoryForm'
 import { formatFullDate, formatShortDate, formatSignedMoney } from '../lib/format'
 import { cn } from '../lib/cn'
 
-function AddCategoryForm({ onAdd, onCancel }) {
-  const [label, setLabel] = useState('')
-  const [iconId, setIconId] = useState(ICON_LIBRARY[0].id)
-  const [color, setColor] = useState(CUSTOM_CATEGORY_SWATCHES[0])
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!label.trim()) return
-    onAdd({ label: label.trim(), icon: iconId, color })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4 border-t border-line pt-4">
-      <Input label="Nombre" placeholder="Ej. Mascotas" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus />
-
-      <div>
-        <span className="mb-2 block text-sm font-medium text-ink">Ícono</span>
-        <div className="grid grid-cols-5 gap-2">
-          {ICON_LIBRARY.map(({ id, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setIconId(id)}
-              className={cn(
-                'flex h-10 items-center justify-center rounded-lg border transition-colors',
-                iconId === id ? 'border-brand-400 bg-brand-500/10' : 'border-line bg-surface2 hover:bg-line/50'
-              )}
-            >
-              <Icon className="h-4.5 w-4.5 text-ink" />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <span className="mb-2 block text-sm font-medium text-ink">Color</span>
-        <div className="flex flex-wrap gap-2">
-          {CUSTOM_CATEGORY_SWATCHES.map((swatch) => (
-            <button
-              key={swatch}
-              type="button"
-              onClick={() => setColor(swatch)}
-              style={{ backgroundColor: swatch }}
-              className={cn(
-                'h-8 w-8 rounded-full transition-all',
-                color === swatch ? 'ring-2 ring-offset-2 ring-brand-400 ring-offset-surface' : 'opacity-80 hover:opacity-100'
-              )}
-              aria-label={swatch}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Button type="button" variant="secondary" className="flex-1" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit" className="flex-1">
-          Agregar
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-// Hogar compartido: quién ve/edita la misma información, invitar por código
+// Finanzas compartidas: quién ve/edita la misma información, invitar por código
 // y unirse al hogar de tu pareja con el código que ella te comparta.
 function HouseholdCard() {
   const { user } = useAuth()
-  const { householdName, memberList, role, inviteCode, regenerateInviteCode, joinWithCode } = useHousehold()
+  const { householdName, memberList, inviteCode, regenerateInviteCode, joinWithCode } = useHousehold()
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [joinCode, setJoinCode] = useState('')
@@ -154,7 +89,7 @@ function HouseholdCard() {
     <Card className="p-5">
       <div className="mb-1 flex items-center gap-2">
         <Users className="h-4 w-4 text-brand-400" />
-        <h2 className="text-sm font-semibold text-ink">Hogar compartido</h2>
+        <h2 className="text-sm font-semibold text-ink">Finanzas compartidas</h2>
       </div>
       <p className="mb-4 text-xs text-muted">
         Invita a tu pareja para que vea y edite la misma información financiera que tú.
@@ -183,40 +118,38 @@ function HouseholdCard() {
         </ul>
       </div>
 
-      {role === 'owner' && (
-        <div className="mb-4 border-t border-line pt-4">
-          <p className="mb-2 text-xs font-medium text-ink">Invitar a alguien</p>
-          {inviteCode ? (
-            <>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 rounded-xl bg-surface2 px-3 py-2.5 text-center text-lg font-bold tracking-widest text-ink">
-                  {inviteCode}
-                </code>
-                <Button variant="secondary" size="icon" onClick={handleCopy} aria-label="Copiar código">
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating}
-                className="mt-2 flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Generar nuevo código
-              </button>
-            </>
-          ) : (
-            <Button variant="secondary" loading={generating} onClick={handleGenerate}>
-              <UserPlus className="h-4 w-4" />
-              Generar código de invitación
-            </Button>
-          )}
-          <p className="mt-2 text-xs text-muted">
-            Comparte este código con tu pareja — al capturarlo abajo, verá y podrá editar la misma información.
-          </p>
-        </div>
-      )}
+      <div className="mb-4 border-t border-line pt-4">
+        <p className="mb-2 text-xs font-medium text-ink">Invitar a alguien</p>
+        {inviteCode ? (
+          <>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded-xl bg-surface2 px-3 py-2.5 text-center text-lg font-bold tracking-widest text-ink">
+                {inviteCode}
+              </code>
+              <Button variant="secondary" size="icon" onClick={handleCopy} aria-label="Copiar código">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={generating}
+              className="mt-2 flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Generar nuevo código
+            </button>
+          </>
+        ) : (
+          <Button variant="secondary" loading={generating} onClick={handleGenerate}>
+            <UserPlus className="h-4 w-4" />
+            Generar código de invitación
+          </Button>
+        )}
+        <p className="mt-2 text-xs text-muted">
+          Comparte este código con tu pareja — al capturarlo abajo, verá y podrá editar la misma información.
+        </p>
+      </div>
 
       <div className="border-t border-line pt-4">
         <p className="mb-2 text-xs font-medium text-ink">Unirme con un código</p>

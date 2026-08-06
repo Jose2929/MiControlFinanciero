@@ -24,6 +24,8 @@ import {
   Blocks,
   Bone,
   Scissors,
+  HandCoins,
+  PiggyBank,
 } from 'lucide-react'
 
 // Fixed order matters: mirrors the validated categorical palette slot order
@@ -65,6 +67,19 @@ export const CATEGORIES = [
     ],
   },
 ]
+
+// Pseudo-categorías de presupuesto (no son categorías de gasto reales, no
+// aparecen en los pickers de "agregar gasto") — permiten que "Pago de deuda"
+// y "Ahorro" vivan como una línea más del presupuesto unificado, en vez de
+// una sección aparte. `spent` para estas sale de agregados de FinanceContext
+// (monthDebtPayments / monthSavingsContribution), no de transacciones por
+// categoryId — ver `budgetProgress` en FinanceContext.jsx.
+export const GOAL_CATEGORIES = [
+  { id: 'goal-debt-payment', label: 'Pago de deuda', icon: HandCoins, color: '#FB923C' },
+  { id: 'goal-savings', label: 'Ahorro', icon: PiggyBank, color: '#2DD4BF' },
+]
+
+export const GOAL_CATEGORY_IDS = new Set(GOAL_CATEGORIES.map((c) => c.id))
 
 export const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]))
 

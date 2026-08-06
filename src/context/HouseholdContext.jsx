@@ -11,6 +11,7 @@ export function HouseholdProvider({ children }) {
   const [householdId, setHouseholdId] = useState(null)
   const [meta, setMeta] = useState(null)
   const [members, setMembers] = useState({})
+  const [inviteCode, setInviteCode] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -20,6 +21,7 @@ export function HouseholdProvider({ children }) {
       setHouseholdId(null)
       setMeta(null)
       setMembers({})
+      setInviteCode(null)
       setLoading(false)
       return
     }
@@ -41,16 +43,23 @@ export function HouseholdProvider({ children }) {
     }
   }, [user])
 
-  // Suscripción en vivo a metadatos y miembros del hogar activo.
+  // Suscripción en vivo a metadatos, miembros y código de invitación del
+  // hogar activo. El código vive en Firebase (regenerateInviteCode lo
+  // escribe) — sin esta suscripción, la UI solo lo conocía en el instante en
+  // que se generaba y lo perdía al recargar la página.
   useEffect(() => {
     if (!householdId) return
     const unsubMeta = onValue(ref(db, `households/${householdId}/meta`), (snap) => setMeta(snap.val()))
     const unsubMembers = onValue(ref(db, `households/${householdId}/members`), (snap) =>
       setMembers(snap.val() || {})
     )
+    const unsubInviteCode = onValue(ref(db, `households/${householdId}/inviteCode`), (snap) =>
+      setInviteCode(snap.val())
+    )
     return () => {
       unsubMeta()
       unsubMembers()
+      unsubInviteCode()
     }
   }, [householdId])
 
@@ -77,6 +86,7 @@ export function HouseholdProvider({ children }) {
     members,
     memberList: Object.entries(members).map(([uid, m]) => ({ uid, ...m })),
     role,
+    inviteCode,
     loading,
     error,
     regenerateInviteCode: doRegenerateInviteCode,

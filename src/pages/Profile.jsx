@@ -101,8 +101,7 @@ function AddCategoryForm({ onAdd, onCancel }) {
 // y unirse al hogar de tu pareja con el código que ella te comparta.
 function HouseholdCard() {
   const { user } = useAuth()
-  const { householdName, memberList, role, regenerateInviteCode, joinWithCode } = useHousehold()
-  const [inviteCode, setInviteCode] = useState(null)
+  const { householdName, memberList, role, inviteCode, regenerateInviteCode, joinWithCode } = useHousehold()
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [joinCode, setJoinCode] = useState('')
@@ -113,8 +112,9 @@ function HouseholdCard() {
     setGenerating(true)
     setFeedback(null)
     try {
-      const code = await regenerateInviteCode()
-      setInviteCode(code)
+      // La suscripción en vivo de useHousehold() refleja el código nuevo
+      // apenas se escribe en Firebase — no hace falta guardarlo aparte.
+      await regenerateInviteCode()
       setCopied(false)
     } catch (err) {
       setFeedback({ type: 'error', text: err.message || 'No se pudo generar el código.' })

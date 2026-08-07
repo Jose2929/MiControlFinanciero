@@ -24,7 +24,9 @@ function DonutTooltip({ active, payload }) {
   )
 }
 
-export function CategoryDonut({ data, total }) {
+export function CategoryDonut({ data }) {
+  const total = data.reduce((s, d) => s + d.amount, 0)
+
   if (!data.length) {
     return (
       <EmptyState

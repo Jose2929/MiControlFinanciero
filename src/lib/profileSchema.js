@@ -21,7 +21,7 @@
 import { getIconById, getIconId } from './categories'
 import { periodKey } from './format'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 // -- Helpers ----------------------------------------------------------------
 
@@ -98,6 +98,10 @@ function deserializeCustomCategory(cat) {
 // Confirmaciones de recurrentes: no tienen id propio -> clave sintética.
 const confirmationKey = (c) => `${c.billId}__${c.period || periodKey(c.date)}`
 
+// Confirmaciones de pago de deuda del mes — mismo patrón que las de
+// recurrentes, evita poder registrar dos pagos del mismo período.
+const debtConfirmationKey = (c) => `${c.debtId}__${c.period || periodKey(c.date)}`
+
 // -- Serialización ----------------------------------------------------------
 
 /**
@@ -117,8 +121,10 @@ export function serializeProfile(state) {
     incomeProfiles = [],
     recurringBills = [],
     recurringConfirmations = [],
+    debtConfirmations = [],
     readIds = new Set(),
     idCounter = 1000,
+    budgetTotalLimit = null,
     user = null,
     updatedAt = null,
   } = state
@@ -130,6 +136,7 @@ export function serializeProfile(state) {
       user: user || null,
     },
     idCounter,
+    budgetTotalLimit,
     accounts: listToMap(accounts),
     transactions: listToMap(transactions.map(serializeTransaction)),
     debts: listToMap(debts.map(serializeDebt)),
@@ -138,6 +145,7 @@ export function serializeProfile(state) {
     incomeProfiles: listToMap(incomeProfiles),
     recurringBills: listToMap(recurringBills),
     recurringConfirmations: listToMap(recurringConfirmations, confirmationKey),
+    debtConfirmations: listToMap(debtConfirmations, debtConfirmationKey),
     readIds: Array.from(readIds),
   }
 }
@@ -183,20 +191,68 @@ export function deserializeProfile(input) {
       ...c,
       date: toDate(c.date),
     })),
+    debtConfirmations: mapToList(migrated.debtConfirmations).map((c) => ({
+      ...c,
+      date: toDate(c.date),
+    })),
     readIds: new Set(Array.isArray(migrated.readIds) ? migrated.readIds : []),
     idCounter: Number(migrated.idCounter) || 1000,
+    budgetTotalLimit: migrated.budgetTotalLimit != null ? Number(migrated.budgetTotalLimit) : null,
     user: migrated.meta?.user || null,
     updatedAt: toDate(migrated.meta?.updatedAt),
   }
 }
 
-// Hook de migración entre versiones de esquema. Hoy solo hay v1; cuando el
-// esquema cambie, se encadenan transformaciones aquí (v0->v1, v1->v2, ...).
+// Hook de migración entre versiones de esquema — se encadenan
+// transformaciones aquí (v0->v1, v1->v2, ...) sobre el árbol crudo, antes de
+// deserializar. Idempotente: si el dato ya viene migrado, no hace nada.
 function migrateProfile(data, fromVersion) {
   let out = data
   if (fromVersion < 1) {
     // v0 (sin meta) -> v1: el esquema es compatible, solo se normaliza meta.
     out = { ...out, meta: { ...(out.meta || {}), schemaVersion: 1 } }
   }
+  if (fromVersion < 2) {
+    // v1 tenía "Pago de deuda"/"Ahorro" como pseudo-categorías especiales
+    // (GOAL_CATEGORIES en categories.js) cuyo "gastado" se calculaba aparte
+    // de las transacciones reales (por tipo, no por categoryId) — un mismo
+    // pago podía contar en dos líneas de presupuesto a la vez sin estar
+    // realmente ligado a ambas. v2 las convierte en categorías normales de
+    // verdad (mismo id, para no perder la línea de presupuesto ya
+    // configurada), y liga a "Pago de deuda" cualquier deuda que no tuviera
+    // ya su propia categoría, para no perder el agregado que ya tenía.
+    out = migrateGoalCategoriesToReal(out)
+  }
   return out
+}
+
+const GOAL_CATEGORY_DEFS = {
+  'goal-debt-payment': { label: 'Pago de deuda', color: '#FB923C', iconId: 'HandCoins' },
+  'goal-savings': { label: 'Ahorro', color: '#2DD4BF', iconId: 'PiggyBank' },
+}
+
+function migrateGoalCategoriesToReal(data) {
+  const budgets = data.budgets || {}
+  const customCategories = { ...(data.customCategories || {}) }
+  const debts = { ...(data.debts || {}) }
+  let changed = false
+
+  for (const [goalId, def] of Object.entries(GOAL_CATEGORY_DEFS)) {
+    if (budgets[goalId] && !customCategories[goalId]) {
+      customCategories[goalId] = { id: goalId, ...def }
+      changed = true
+    }
+  }
+
+  if (customCategories['goal-debt-payment']) {
+    for (const id of Object.keys(debts)) {
+      if (!debts[id].categoryId) {
+        debts[id] = { ...debts[id], categoryId: 'goal-debt-payment' }
+        changed = true
+      }
+    }
+  }
+
+  if (!changed) return data
+  return { ...data, customCategories, debts }
 }

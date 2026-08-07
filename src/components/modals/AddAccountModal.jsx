@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -15,8 +15,10 @@ const GRADIENTS = [
   { id: 'slate', cls: 'from-slate-600 via-slate-700 to-slate-900' },
 ]
 
-export function AddAccountModal({ open, onClose }) {
-  const { addAccount } = useFinance()
+// mode: { type: 'create' } | { type: 'edit', account }
+export function AddAccountModal({ mode, onClose }) {
+  const { addAccount, updateAccount } = useFinance()
+  const isEdit = mode?.type === 'edit'
   const [name, setName] = useState('')
   const [bank, setBank] = useState('')
   const [type, setType] = useState('debito')
@@ -26,6 +28,25 @@ export function AddAccountModal({ open, onClose }) {
   const [used, setUsed] = useState('')
   const [goal, setGoal] = useState('')
   const [gradient, setGradient] = useState(GRADIENTS[0].cls)
+
+  useEffect(() => {
+    if (!mode) return
+    if (isEdit) {
+      const a = mode.account
+      setName(a.name || '')
+      setBank(a.bank || '')
+      setType(a.type)
+      setLast4(a.last4 || '')
+      setBalance(a.balance != null ? String(a.balance) : '')
+      setLimit(a.limit != null ? String(a.limit) : '')
+      setUsed(a.used != null ? String(a.used) : '')
+      setGoal(a.goal != null ? String(a.goal) : '')
+      setGradient(a.gradient || GRADIENTS[0].cls)
+    } else {
+      reset()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
 
   function reset() {
     setName('')
@@ -47,22 +68,28 @@ export function AddAccountModal({ open, onClose }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) return
-    addAccount({
+    const patch = {
       name: name.trim(),
       bank: bank.trim() || null,
       type,
       last4: type === 'efectivo' ? null : last4.trim() || null,
-      balance: type !== 'credito' ? Number(balance) || 0 : undefined,
-      limit: type === 'credito' ? Number(limit) || 0 : undefined,
-      used: type === 'credito' ? Number(used) || 0 : undefined,
-      goal: type === 'ahorro' ? Number(goal) || 0 : undefined,
+      ...(type !== 'credito' && { balance: Number(balance) || 0 }),
+      ...(type === 'credito' && { limit: Number(limit) || 0, used: Number(used) || 0 }),
+      ...(type === 'ahorro' && { goal: Number(goal) || 0 }),
       gradient,
-    })
+    }
+    if (isEdit) {
+      updateAccount(mode.account.id, patch)
+    } else {
+      addAccount(patch)
+    }
     handleClose()
   }
 
+  if (!mode) return null
+
   return (
-    <Modal open={open} onClose={handleClose} title="Agregar cuenta">
+    <Modal open={Boolean(mode)} onClose={handleClose} title={isEdit ? 'Editar cuenta' : 'Agregar cuenta'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Nombre de la cuenta"
@@ -73,7 +100,7 @@ export function AddAccountModal({ open, onClose }) {
         />
         <div className="grid grid-cols-2 gap-3">
           <Input label="Banco (opcional)" placeholder="Ej. HSBC" value={bank} onChange={(e) => setBank(e.target.value)} />
-          <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value)}>
+          <Select label="Tipo" value={type} onChange={(e) => setType(e.target.value)} disabled={isEdit}>
             <option value="debito">Débito</option>
             <option value="credito">Crédito</option>
             <option value="efectivo">Efectivo</option>
@@ -137,7 +164,7 @@ export function AddAccountModal({ open, onClose }) {
         </div>
 
         <Button type="submit" size="lg" className="w-full">
-          Guardar cuenta
+          {isEdit ? 'Guardar cambios' : 'Guardar cuenta'}
         </Button>
       </form>
     </Modal>

@@ -9,14 +9,30 @@ const ICON_BG = {
   warning: 'bg-warning-soft text-warning',
 }
 
-export function StatCard({ icon: Icon, label, value, variant = 'positive', delta, deltaGoodDirection = 'down' }) {
+export function StatCard({
+  icon: Icon,
+  label,
+  value,
+  variant = 'positive',
+  delta,
+  deltaGoodDirection = 'down',
+  onClick,
+}) {
   const hasDelta = typeof delta === 'number' && Number.isFinite(delta)
   const isUp = hasDelta && delta > 0
   const isFlat = hasDelta && Math.abs(delta) < 0.5
   const isGood = hasDelta && !isFlat && (deltaGoodDirection === 'down' ? delta < 0 : delta > 0)
 
   return (
-    <Card className="animate-fade-in-up p-5">
+    <Card
+      as={onClick ? 'button' : 'div'}
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={cn(
+        'animate-fade-in-up p-5',
+        onClick && 'w-full text-left transition-transform hover:scale-[1.01] active:scale-[0.99]'
+      )}
+    >
       <div className="flex items-center gap-3">
         <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', ICON_BG[variant])}>
           <Icon className="h-5 w-5" />

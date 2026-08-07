@@ -8,14 +8,14 @@ import { RegisterSavingMovementModal } from '../components/modals/RegisterSaving
 
 export default function Accounts() {
   const { accounts } = useFinance()
-  const [open, setOpen] = useState(false)
+  const [modalMode, setModalMode] = useState(null)
   const [savingsAccount, setSavingsAccount] = useState(null)
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">{accounts.length} cuentas registradas</p>
-        <Button size="sm" onClick={() => setOpen(true)}>
+        <Button size="sm" onClick={() => setModalMode({ type: 'create' })}>
           <Plus className="h-4 w-4" />
           Agregar cuenta
         </Button>
@@ -27,12 +27,13 @@ export default function Accounts() {
             <AccountCard
               account={account}
               onRegisterMovement={account.type === 'ahorro' ? setSavingsAccount : undefined}
+              onEdit={(a) => setModalMode({ type: 'edit', account: a })}
             />
           </div>
         ))}
       </div>
 
-      <AddAccountModal open={open} onClose={() => setOpen(false)} />
+      <AddAccountModal mode={modalMode} onClose={() => setModalMode(null)} />
       <RegisterSavingMovementModal account={savingsAccount} onClose={() => setSavingsAccount(null)} />
     </div>
   )

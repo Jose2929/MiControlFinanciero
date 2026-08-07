@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpCircle, ArrowDownCircle, HandCoins, CalendarClock, Repeat } from 'lucide-react'
 import { useFinance } from '../context/FinanceContext'
@@ -9,6 +10,7 @@ import { StatCard } from '../components/finance/StatCard'
 import { CategoryDonut } from '../components/charts/CategoryDonut'
 import { TrendAreaChart } from '../components/charts/TrendAreaChart'
 import { UpcomingPaymentItem } from '../components/finance/UpcomingPaymentItem'
+import { DebtBreakdownModal } from '../components/modals/DebtBreakdownModal'
 import { formatMoney, formatRelativeDue, URGENCY_LABELS } from '../lib/format'
 
 const URGENCY_VARIANT = { ok: 'positive', soon: 'warning', urgent: 'negative', overdue: 'negative' }
@@ -38,6 +40,7 @@ export default function Dashboard() {
 
   const soonPayments = upcomingPayments.filter((d) => d.urgency !== 'ok').slice(0, 5)
   const pendingRecurring = recurringStatus.filter((b) => !b.confirmed)
+  const [showDebtBreakdown, setShowDebtBreakdown] = useState(false)
 
   return (
     <div className="space-y-6">
@@ -74,13 +77,16 @@ export default function Dashboard() {
           variant="warning"
           delta={pctDelta(totalDebt, prevTotalDebt)}
           deltaGoodDirection="down"
+          onClick={() => setShowDebtBreakdown(true)}
         />
       </div>
+
+      <DebtBreakdownModal open={showDebtBreakdown} onClose={() => setShowDebtBreakdown(false)} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <Card className="animate-fade-in-up p-5 lg:col-span-3">
           <h2 className="mb-4 text-sm font-semibold text-ink">Gastos por categoría</h2>
-          <CategoryDonut data={spendByCategory} total={monthExpenses} />
+          <CategoryDonut data={spendByCategory} />
         </Card>
 
         <Card className="animate-fade-in-up p-5 lg:col-span-2">

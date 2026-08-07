@@ -36,7 +36,7 @@ function SaveButton() {
   let label = 'Guardado'
   let Icon = Check
   if (saving) {
-    label = 'Guardando…'
+    label = 'Guardando información…'
   } else if (conflict) {
     label = 'Hay cambios nuevos'
     Icon = Users
@@ -44,7 +44,9 @@ function SaveButton() {
     label = 'Reintentar'
     Icon = AlertCircle
   } else if (dirty || !lastSavedAt) {
-    label = 'Guardar'
+    // El guardado ya es automático — este botón queda como respaldo para
+    // forzar un guardado inmediato (ej. justo antes de cerrar la pestaña).
+    label = 'Cambios sin guardar'
     Icon = Save
   }
 

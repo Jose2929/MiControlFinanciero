@@ -8,10 +8,11 @@ import { useFinance } from '../../context/FinanceContext'
 import { formatMoney } from '../../lib/format'
 
 export function RegisterSavingMovementModal({ account, onClose }) {
-  const { accounts, registerSavingMovement } = useFinance()
+  const { accounts, allCategories, registerSavingMovement } = useFinance()
   const [direction, setDirection] = useState('deposito')
   const [amount, setAmount] = useState('')
   const [counterAccountId, setCounterAccountId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
 
@@ -26,6 +27,7 @@ export function RegisterSavingMovementModal({ account, onClose }) {
       setDirection('deposito')
       setAmount('')
       setCounterAccountId(counterOptions[0]?.id || '')
+      setCategoryId(allCategories.find((c) => c.id === 'goal-savings')?.id || allCategories[0]?.id || '')
       setNote('')
       setError('')
     }
@@ -48,6 +50,7 @@ export function RegisterSavingMovementModal({ account, onClose }) {
     registerSavingMovement({
       accountId: account.id,
       counterAccountId: counterAccountId || null,
+      categoryId,
       amount: value,
       direction,
       note,
@@ -102,6 +105,14 @@ export function RegisterSavingMovementModal({ account, onClose }) {
           {counterOptions.map((acc) => (
             <option key={acc.id} value={acc.id}>
               {acc.name}
+            </option>
+          ))}
+        </Select>
+
+        <Select label="Categoría" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          {allCategories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
             </option>
           ))}
         </Select>

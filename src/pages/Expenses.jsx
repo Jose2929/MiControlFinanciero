@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, Receipt, X } from 'lucide-react'
 import { useFinance } from '../context/FinanceContext'
+import { useHousehold } from '../context/HouseholdContext'
 import { Card } from '../components/ui/Card'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
@@ -8,20 +10,32 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { TransactionRow } from '../components/finance/TransactionRow'
 import { MoneyText } from '../components/finance/MoneyText'
 import { ConvertToMSIModal } from '../components/modals/ConvertToMSIModal'
+import { EditTransactionModal } from '../components/modals/EditTransactionModal'
 import { formatGroupLabel, formatMoney, startOfDay } from '../lib/format'
 import { getSubcategory } from '../lib/categories'
 import { cn } from '../lib/cn'
 
 export default function Expenses() {
   const { transactions, allCategories, accounts, findCategory } = useFinance()
+  const { memberList } = useHousehold()
+  // Filtros iniciales opcionales desde el drill-down de Presupuesto
+  // (?category=&from=&to=) — solo se leen una vez, al montar.
+  const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [categoryId, setCategoryId] = useState('all')
+  const [categoryId, setCategoryId] = useState(searchParams.get('category') || 'all')
   const [accountId, setAccountId] = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [authorId, setAuthorId] = useState('all')
+  const [dateFrom, setDateFrom] = useState(searchParams.get('from') || '')
+  const [dateTo, setDateTo] = useState(searchParams.get('to') || '')
   const [convertingTx, setConvertingTx] = useState(null)
+  const [editingTx, setEditingTx] = useState(null)
+
+  // Con un solo miembro en el hogar no tiene caso mostrar "quién lo
+  // registró" — se activa solo, sin cambios, en cuanto se une un invitado.
+  const showAuthor = memberList.length > 1
 
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a])), [accounts])
+  const authorMap = useMemo(() => Object.fromEntries(memberList.map((m) => [m.uid, m])), [memberList])
 
   const expenses = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -29,9 +43,10 @@ export default function Expenses() {
     const to = dateTo ? startOfDay(dateTo).getTime() : null
 
     return transactions
-      .filter((t) => t.type === 'expense')
+      .filter((t) => t.type === 'expense' || t.type === 'debt_payment' || t.type === 'saving_movement')
       .filter((t) => categoryId === 'all' || t.categoryId === categoryId)
       .filter((t) => accountId === 'all' || t.accountId === accountId)
+      .filter((t) => authorId === 'all' || t.createdBy === authorId)
       .filter((t) => {
         const time = startOfDay(t.date).getTime()
         if (from !== null && time < from) return false
@@ -49,7 +64,7 @@ export default function Expenses() {
         )
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date))
-  }, [transactions, search, categoryId, accountId, dateFrom, dateTo, findCategory, accountMap])
+  }, [transactions, search, categoryId, accountId, authorId, dateFrom, dateTo, findCategory, accountMap])
 
   const groups = useMemo(() => {
     const map = new Map()
@@ -61,17 +76,22 @@ export default function Expenses() {
     return [...map.values()]
   }, [expenses])
 
-  const hasFilters = categoryId !== 'all' || accountId !== 'all' || dateFrom || dateTo || search
+  const hasFilters =
+    categoryId !== 'all' || accountId !== 'all' || authorId !== 'all' || dateFrom || dateTo || search
 
   function clearFilters() {
     setSearch('')
     setCategoryId('all')
     setAccountId('all')
+    setAuthorId('all')
     setDateFrom('')
     setDateTo('')
   }
 
-  const total = expenses.filter((t) => !t.convertedToMsi).reduce((s, t) => s + t.amount, 0)
+  // Un retiro de ahorro no es un gasto — resta en vez de sumar al total.
+  const signedAmount = (t) => (t.type === 'saving_movement' && t.direction === 'retiro' ? -t.amount : t.amount)
+
+  const total = expenses.filter((t) => !t.convertedToMsi).reduce((s, t) => s + signedAmount(t), 0)
 
   return (
     <div className="space-y-5">
@@ -123,6 +143,20 @@ export default function Expenses() {
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
           />
+          {showAuthor && (
+            <Select
+              containerClassName="col-span-1"
+              value={authorId}
+              onChange={(e) => setAuthorId(e.target.value)}
+            >
+              <option value="all">Registrado por: todos</option>
+              {memberList.map((m) => (
+                <option key={m.uid} value={m.uid}>
+                  {m.name || m.email}
+                </option>
+              ))}
+            </Select>
+          )}
         </div>
         {hasFilters && (
           <button
@@ -158,7 +192,7 @@ export default function Expenses() {
           {groups.map((group) => {
             const groupTotal = group.items
               .filter((t) => !t.convertedToMsi)
-              .reduce((s, t) => s + t.amount, 0)
+              .reduce((s, t) => s + signedAmount(t), 0)
             return (
               <Card key={group.date.toString()} className={cn('animate-fade-in-up p-4')}>
                 <div className="mb-1 flex items-center justify-between px-1">
@@ -173,7 +207,9 @@ export default function Expenses() {
                       category={findCategory(t.categoryId)}
                       subcategory={getSubcategory(t.categoryId, t.subcategoryId)}
                       account={accountMap[t.accountId]}
+                      author={showAuthor ? authorMap[t.createdBy] : null}
                       onConvertToMsi={setConvertingTx}
+                      onEdit={setEditingTx}
                     />
                   ))}
                 </div>
@@ -184,6 +220,7 @@ export default function Expenses() {
       )}
 
       <ConvertToMSIModal transaction={convertingTx} onClose={() => setConvertingTx(null)} />
+      <EditTransactionModal transaction={editingTx} onClose={() => setEditingTx(null)} />
     </div>
   )
 }

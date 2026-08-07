@@ -16,7 +16,7 @@ export const NAV_ITEMS = [
 export const BOTTOM_NAV_ITEMS = [
   { to: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
   { to: '/gastos', label: 'Gastos', icon: Receipt },
-  { to: '/cuentas', label: 'Cuentas', icon: Wallet },
+  { to: '/presupuestos', label: 'Presupuestos', icon: PiggyBank },
   { to: '/deudas', label: 'Deudas', icon: HandCoins },
   { to: '/perfil', label: 'Perfil', icon: User },
 ]
@@ -26,8 +26,8 @@ export const BOTTOM_NAV_ITEMS = [
 // every breakpoint without crowding the 5-item mobile bottom nav.
 export const MORE_MENU_ITEMS = [
   { to: '/ingresos', label: 'Ingresos', icon: TrendingUp },
+  { to: '/cuentas', label: 'Cuentas', icon: Wallet },
   { to: '/recurrentes', label: 'Recurrentes', icon: Repeat },
-  { to: '/presupuestos', label: 'Presupuestos', icon: PiggyBank },
   { to: '/notificaciones', label: 'Notificaciones', icon: Bell },
 ]
 

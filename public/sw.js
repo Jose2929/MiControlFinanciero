@@ -2,7 +2,7 @@
 // descartar assets viejos en caché (p.ej. si el build anterior quedó con
 // config rota) — el activate de abajo borra cualquier caché con nombre
 // distinto al actual.
-const CACHE_NAME = 'mcf-cache-v3'
+const CACHE_NAME = 'mcf-cache-v4'
 
 const APP_SHELL = [
   './',

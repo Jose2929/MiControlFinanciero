@@ -1,4 +1,4 @@
-import { Wifi, Wallet, PiggyBank } from 'lucide-react'
+import { Wifi, Wallet, PiggyBank, Pencil } from 'lucide-react'
 import { formatMoney, formatPercent } from '../../lib/format'
 import { ProgressBar } from '../ui/ProgressBar'
 import { Button } from '../ui/Button'
@@ -11,7 +11,7 @@ const TYPE_LABEL = {
   ahorro: 'Ahorro',
 }
 
-export function AccountCard({ account, onRegisterMovement }) {
+export function AccountCard({ account, onRegisterMovement, onEdit }) {
   const isCredit = account.type === 'credito'
   const isSavings = account.type === 'ahorro'
   const utilization = isCredit && account.limit > 0 ? (account.used / account.limit) * 100 : 0
@@ -32,13 +32,26 @@ export function AccountCard({ account, onRegisterMovement }) {
           <p className="text-sm font-medium text-white/80">{account.name}</p>
           <p className="text-xs text-white/60">{TYPE_LABEL[account.type]}</p>
         </div>
-        {isSavings ? (
-          <PiggyBank className="h-6 w-6 text-white/70" />
-        ) : account.type === 'efectivo' ? (
-          <Wallet className="h-6 w-6 text-white/70" />
-        ) : (
-          <Wifi className="h-6 w-6 rotate-90 text-white/70" />
-        )}
+        <div className="flex items-center gap-1.5">
+          {isSavings ? (
+            <PiggyBank className="h-6 w-6 text-white/70" />
+          ) : account.type === 'efectivo' ? (
+            <Wallet className="h-6 w-6 text-white/70" />
+          ) : (
+            <Wifi className="h-6 w-6 rotate-90 text-white/70" />
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(account)}
+              aria-label={`Editar ${account.name}`}
+              title="Editar cuenta"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative">

@@ -25,6 +25,13 @@ export function AddExpenseModal({ open, onClose }) {
   const [date, setDate] = useState(todayISO())
   const [error, setError] = useState('')
 
+  const [paysCard, setPaysCard] = useState(false)
+  const [counterAccountId, setCounterAccountId] = useState('')
+  const creditAccounts = useMemo(
+    () => accounts.filter((a) => a.type === 'credito' && a.id !== accountId),
+    [accounts, accountId]
+  )
+
   const [deferred, setDeferred] = useState(false)
   const [months, setMonths] = useState(3)
   const [customMonths, setCustomMonths] = useState('')
@@ -47,6 +54,8 @@ export function AddExpenseModal({ open, onClose }) {
     setCustomMonths('')
     setInterestFree(true)
     setMonthlyRate('')
+    setPaysCard(false)
+    setCounterAccountId('')
   }
 
   function handleClose() {
@@ -87,9 +96,24 @@ export function AddExpenseModal({ open, onClose }) {
         date,
       })
     } else {
-      addExpense({ amount: value, categoryId, subcategoryId, accountId, note, date })
+      addExpense({
+        amount: value,
+        categoryId,
+        subcategoryId,
+        accountId,
+        counterAccountId: paysCard ? counterAccountId : null,
+        note,
+        date,
+      })
     }
     handleClose()
+  }
+
+  function handleTogglePaysCard(checked) {
+    setPaysCard(checked)
+    if (checked && !creditAccounts.some((a) => a.id === counterAccountId)) {
+      setCounterAccountId(creditAccounts[0]?.id || '')
+    }
   }
 
   function handleAmountChange(e) {
@@ -208,7 +232,35 @@ export function AddExpenseModal({ open, onClose }) {
           <Input label="Nota (opcional)" placeholder="Ej. Cena con amigos" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 
-        <div className="rounded-xl border border-line bg-surface2 p-4">
+        {!deferred && creditAccounts.length > 0 && (
+          <div className="rounded-xl border border-line bg-surface2 p-4">
+            <Toggle
+              checked={paysCard}
+              onChange={handleTogglePaysCard}
+              label="Este gasto paga una tarjeta de crédito"
+              description="Reduce el saldo usado de la tarjeta que elijas"
+            />
+
+            {paysCard && (
+              <div className="mt-4 border-t border-line pt-4">
+                <Select
+                  label="Tarjeta a pagar"
+                  value={counterAccountId}
+                  onChange={(e) => setCounterAccountId(e.target.value)}
+                >
+                  {creditAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!paysCard && (
+          <div className="rounded-xl border border-line bg-surface2 p-4">
           <Toggle
             checked={deferred}
             onChange={setDeferred}
@@ -280,6 +332,7 @@ export function AddExpenseModal({ open, onClose }) {
             </div>
           )}
         </div>
+        )}
 
         <Button type="submit" size="lg" className="w-full">
           {deferred ? 'Diferir gasto' : 'Guardar gasto'}

@@ -16,6 +16,7 @@ import {
   UserPlus,
   RefreshCw,
   Scale,
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -194,7 +195,7 @@ function HouseholdCard() {
 // filtran por tipo exacto), así que se listan aquí para no perderles el
 // rastro.
 function AdjustBalanceCard() {
-  const { transactions, accounts } = useFinance()
+  const { transactions, accounts, deleteBalanceAdjustment } = useFinance()
   const [open, setOpen] = useState(false)
 
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
@@ -235,6 +236,14 @@ function AdjustBalanceCard() {
               >
                 {formatSignedMoney(tx.amount)}
               </span>
+              <button
+                type="button"
+                onClick={() => deleteBalanceAdjustment(tx.id)}
+                aria-label={`Eliminar ajuste: ${tx.note}`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-negative-soft hover:text-negative"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </li>
           ))}
         </ul>

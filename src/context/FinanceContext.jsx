@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { ref, get, set, onValue } from 'firebase/database'
 import { STATIC_NOTIFICATIONS } from '../data/mockData'
-import { CATEGORIES, getCategory, getIconById, GOAL_CATEGORIES, GOAL_CATEGORY_IDS } from '../lib/categories'
+import { CATEGORIES, getCategory, getIconById } from '../lib/categories'
 import { serializeProfile, deserializeProfile } from '../lib/profileSchema'
 import { createFirebaseRealtimeStore } from '../lib/profileStore'
 import { db } from '../lib/firebase'
@@ -22,6 +22,9 @@ import {
 
 const FinanceContext = createContext(null)
 
+// Tiempo de inactividad antes de guardar solo, tras la última edición.
+const AUTOSAVE_DELAY_MS = 1500
+
 let localIdCounter = 1000
 const nextLocalId = (prefix) => `${prefix}-${(localIdCounter += 1)}`
 const getIdCounter = () => localIdCounter
@@ -29,6 +32,34 @@ const getIdCounter = () => localIdCounter
 // id usado para que los ids nuevos no colisionen con los restaurados.
 const bumpIdCounter = (n) => {
   if (Number.isFinite(n) && n > localIdCounter) localIdCounter = n
+}
+
+// Ajusta el saldo de una cuenta por un gasto — sign +1 aplica un gasto nuevo,
+// -1 lo revierte (usado al editar/eliminar una transacción existente).
+// counterAccountId es opcional: si el gasto "paga" una tarjeta de crédito
+// (ese gasto se origina de otra cuenta pero también salda esa tarjeta), la
+// cuenta contraparte baja su `used` — lo contrario de cargarle un gasto.
+function applyExpenseEffect(accounts, accountId, amount, sign, counterAccountId) {
+  return accounts.map((acc) => {
+    if (acc.id === accountId) {
+      if (acc.type === 'credito') return { ...acc, used: Math.max(acc.used + sign * amount, 0) }
+      return { ...acc, balance: acc.balance - sign * amount }
+    }
+    if (counterAccountId && acc.id === counterAccountId && acc.type === 'credito') {
+      return { ...acc, used: Math.max(acc.used - sign * amount, 0) }
+    }
+    return acc
+  })
+}
+
+// Igual que applyExpenseEffect pero para pagos de deuda — polaridad opuesta
+// en tarjetas de crédito (un pago BAJA el saldo usado, no lo sube).
+function applyDebtPaymentEffect(accounts, accountId, amount, sign) {
+  return accounts.map((acc) => {
+    if (acc.id !== accountId) return acc
+    if (acc.type === 'credito') return { ...acc, used: Math.max(acc.used - sign * amount, 0) }
+    return { ...acc, balance: acc.balance - sign * amount }
+  })
 }
 
 export function FinanceProvider({ children, store: providedStore }) {
@@ -45,6 +76,8 @@ export function FinanceProvider({ children, store: providedStore }) {
   const [incomeProfiles, setIncomeProfiles] = useState([])
   const [recurringBills, setRecurringBills] = useState([])
   const [recurringConfirmations, setRecurringConfirmations] = useState([])
+  const [debtConfirmations, setDebtConfirmations] = useState([])
+  const [budgetTotalLimit, setBudgetTotalLimitState] = useState(null)
 
   // -- Persistencia (Firebase RTDB, guardado manual + lectura en vivo) ----
   // El adaptador apunta a households/{householdId}/profile — el nodo
@@ -86,7 +119,9 @@ export function FinanceProvider({ children, store: providedStore }) {
     setIncomeProfiles(data.incomeProfiles)
     setRecurringBills(data.recurringBills)
     setRecurringConfirmations(data.recurringConfirmations)
+    setDebtConfirmations(data.debtConfirmations)
     setReadIds(data.readIds)
+    setBudgetTotalLimitState(data.budgetTotalLimit)
     bumpIdCounter(data.idCounter)
   }, [])
 
@@ -102,8 +137,10 @@ export function FinanceProvider({ children, store: providedStore }) {
         incomeProfiles,
         recurringBills,
         recurringConfirmations,
+        debtConfirmations,
         readIds,
         idCounter: getIdCounter(),
+        budgetTotalLimit,
         user: authUser,
         updatedAt: new Date(),
       }),
@@ -116,7 +153,9 @@ export function FinanceProvider({ children, store: providedStore }) {
       incomeProfiles,
       recurringBills,
       recurringConfirmations,
+      debtConfirmations,
       readIds,
+      budgetTotalLimit,
       authUser,
     ]
   )
@@ -179,6 +218,8 @@ export function FinanceProvider({ children, store: providedStore }) {
     incomeProfiles,
     recurringBills,
     recurringConfirmations,
+    debtConfirmations,
+    budgetTotalLimit,
     readIds,
   ])
 
@@ -211,6 +252,32 @@ export function FinanceProvider({ children, store: providedStore }) {
     },
     [buildSnapshot, store]
   )
+
+  // Guardado automático: cada edición nueva reinicia un pequeño debounce; al
+  // dejar de haber cambios por AUTOSAVE_DELAY_MS, se guarda solo. Si cae en
+  // conflicto, saveProfile() ya lo maneja (no sobreescribe solo) — aquí no
+  // hace falta lógica extra, solo no reintentar en loop.
+  useEffect(() => {
+    if (!dirty) return
+    const timer = setTimeout(() => {
+      saveProfile().catch(() => {})
+    }, AUTOSAVE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [
+    dirty,
+    accounts,
+    transactions,
+    debts,
+    budgets,
+    customCategories,
+    incomeProfiles,
+    recurringBills,
+    recurringConfirmations,
+    debtConfirmations,
+    budgetTotalLimit,
+    readIds,
+    saveProfile,
+  ])
 
   // Descarta las ediciones locales sin guardar y aplica el snapshot remoto
   // pendiente — la otra mitad del diálogo de conflicto.
@@ -246,19 +313,6 @@ export function FinanceProvider({ children, store: providedStore }) {
     [allCategories]
   )
 
-  // Categorías de gasto + las 2 pseudo-categorías de meta (deuda/ahorro) —
-  // solo para el selector de presupuesto, NUNCA para categorizar un gasto
-  // real (por eso no se mezclan en `allCategories`).
-  const budgetableCategories = useMemo(
-    () => [...allCategories, ...GOAL_CATEGORIES],
-    [allCategories]
-  )
-
-  const findBudgetCategory = useCallback(
-    (id) => GOAL_CATEGORIES.find((c) => c.id === id) || findCategory(id),
-    [findCategory]
-  )
-
   const findIncomeProfile = useCallback(
     (id) => incomeProfiles.find((p) => p.id === id) || { id, label: 'Ingreso', mode: 'fixed' },
     [incomeProfiles]
@@ -275,17 +329,40 @@ export function FinanceProvider({ children, store: providedStore }) {
   )
 
   const sumBy = (list, type) => list.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0)
-  // Expenses converted to MSI are no longer a lump-sum outflow — they're
-  // replaced by the debt's future installment payments — so they're excluded
-  // here to avoid double-counting (they still show, struck through, in Gastos).
-  const sumExpenses = (list) =>
-    list.filter((t) => t.type === 'expense' && !t.convertedToMsi).reduce((s, t) => s + t.amount, 0)
 
   const monthIncome = useMemo(() => sumBy(monthTransactions, 'income'), [monthTransactions])
-  const monthExpenses = useMemo(() => sumExpenses(monthTransactions), [monthTransactions])
+
+  // Un gasto cuenta como pago de deuda para este desglose (no como "gasto"),
+  // sin importar si se creó como gasto normal o vía "Registrar pago" — lo que
+  // manda es: (a) su categoría está ligada a una deuda (p.ej. "Hipoteca"), o
+  // (b) tiene un counterAccountId apuntando a una tarjeta de crédito (o sea,
+  // este gasto la está pagando) — mismo principio de budgetProgress (ronda 8).
+  const debtCategoryIds = useMemo(
+    () => new Set(debts.map((d) => d.categoryId).filter(Boolean)),
+    [debts]
+  )
+  const creditAccountIds = useMemo(
+    () => new Set(accounts.filter((a) => a.type === 'credito').map((a) => a.id)),
+    [accounts]
+  )
+  const isDebtPaymentExpense = (t) =>
+    t.type === 'expense' &&
+    !t.convertedToMsi &&
+    (debtCategoryIds.has(t.categoryId) || creditAccountIds.has(t.counterAccountId))
+
+  const monthExpenses = useMemo(
+    () =>
+      monthTransactions
+        .filter((t) => t.type === 'expense' && !t.convertedToMsi && !isDebtPaymentExpense(t))
+        .reduce((s, t) => s + t.amount, 0),
+    [monthTransactions, debtCategoryIds, creditAccountIds]
+  )
   const monthDebtPayments = useMemo(
-    () => sumBy(monthTransactions, 'debt_payment'),
-    [monthTransactions]
+    () =>
+      monthTransactions
+        .filter((t) => t.type === 'debt_payment' || isDebtPaymentExpense(t))
+        .reduce((s, t) => s + t.amount, 0),
+    [monthTransactions, debtCategoryIds, creditAccountIds]
   )
   // Ajustes manuales de saldo (p.ej. "ya recibí y gasté el ingreso de este
   // mes antes de empezar a registrar") — su monto va firmado, así que sumBy
@@ -308,9 +385,24 @@ export function FinanceProvider({ children, store: providedStore }) {
   }, [monthTransactions, incomeProfiles])
 
   const prevMonthIncome = useMemo(() => sumBy(prevMonthTransactions, 'income'), [prevMonthTransactions])
-  const prevMonthExpenses = useMemo(() => sumExpenses(prevMonthTransactions), [prevMonthTransactions])
+  // Mismo criterio de reclasificación por categoría que monthExpenses, para
+  // que el % de cambio vs. el mes anterior compare gastos con gastos.
+  const prevMonthExpenses = useMemo(
+    () =>
+      prevMonthTransactions
+        .filter((t) => t.type === 'expense' && !t.convertedToMsi && !isDebtPaymentExpense(t))
+        .reduce((s, t) => s + t.amount, 0),
+    [prevMonthTransactions, debtCategoryIds, creditAccountIds]
+  )
 
-  const totalDebt = useMemo(() => debts.reduce((s, d) => s + d.remainingBalance, 0), [debts])
+  // Deuda total = deudas registradas + saldo usado de todas las tarjetas de
+  // crédito (una tarjeta es su propia deuda implícita vía `used`).
+  const totalDebt = useMemo(
+    () =>
+      debts.reduce((s, d) => s + d.remainingBalance, 0) +
+      accounts.filter((a) => a.type === 'credito').reduce((s, a) => s + (a.used || 0), 0),
+    [debts, accounts]
+  )
   const prevTotalDebt = totalDebt + monthDebtPayments // approx: debt before this month's payments
 
   const totalSavings = useMemo(
@@ -329,11 +421,11 @@ export function FinanceProvider({ children, store: providedStore }) {
     [monthTransactions]
   )
 
-  // -- Spend by category (current month, expenses only) ------------------
+  // -- Spend by category (current month, expenses + pagos de deuda categorizados) --
   const spendByCategory = useMemo(() => {
     const totals = new Map()
     monthTransactions
-      .filter((t) => t.type === 'expense' && !t.convertedToMsi)
+      .filter((t) => (t.type === 'expense' || t.type === 'debt_payment') && !t.convertedToMsi)
       .forEach((t) => {
         totals.set(t.categoryId, (totals.get(t.categoryId) || 0) + t.amount)
       })
@@ -364,49 +456,61 @@ export function FinanceProvider({ children, store: providedStore }) {
   }, [transactions])
 
   // -- Upcoming debt payments ----------------------------------------------
-  const upcomingPayments = useMemo(
-    () =>
-      debts
-        .filter((d) => d.remainingBalance > 0)
-        .map((d) => ({ ...d, urgency: getDueUrgency(d.dueDate) }))
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)),
-    [debts]
-  )
+  // Una deuda cuenta como pagada este mes si se confirmó por el flujo de
+  // "Registrar pago" O si ya existe un gasto/pago de este mes en su misma
+  // categoría (p.ej. registrado directo desde "Agregar gasto") — la
+  // categoría es la única fuente de verdad, no el tipo de transacción.
+  const upcomingPayments = useMemo(() => {
+    const period = periodKey()
+    return debts
+      .filter((d) => d.remainingBalance > 0)
+      .map((d) => ({
+        ...d,
+        urgency: getDueUrgency(d.dueDate),
+        confirmed:
+          debtConfirmations.some((c) => c.debtId === d.id && c.period === period) ||
+          (d.categoryId != null &&
+            monthTransactions.some(
+              (t) =>
+                !t.convertedToMsi &&
+                t.categoryId === d.categoryId &&
+                (t.type === 'expense' || t.type === 'debt_payment')
+            )),
+      }))
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+  }, [debts, debtConfirmations, monthTransactions])
 
   // -- Budget progress -------------------------------------------------
-  // Superar una categoría de gasto es malo (getBudgetStatus: rojo >90%);
-  // superar una meta de deuda/ahorro es bueno — por eso las metas usan su
-  // propia escala de estado, invertida.
-  const getGoalStatus = (percent) => {
-    if (percent >= 90) return 'ok'
-    if (percent >= 40) return 'warning'
-    return 'brand'
-  }
+  // El "gastado" de CUALQUIER línea de presupuesto sale exclusivamente de
+  // sumar transacciones reales cuyo categoryId coincide — sin excepciones ni
+  // categorías con cálculo especial (ver ronda 8: antes "Pago de deuda"/
+  // "Ahorro" sumaban aparte por tipo de transacción, sin mirar categoryId,
+  // lo que hacía que un mismo pago pareciera contar en dos presupuestos a la
+  // vez sin estar realmente ligado a ambos).
+  const spentByCategoryId = (txs, categoryId) =>
+    txs
+      .filter((t) => !t.convertedToMsi && t.categoryId === categoryId)
+      .reduce((s, t) => {
+        if (t.type === 'expense' || t.type === 'debt_payment') return s + t.amount
+        if (t.type === 'saving_movement') return s + (t.direction === 'retiro' ? -t.amount : t.amount)
+        return s
+      }, 0)
 
   const budgetProgress = useMemo(() => {
     return budgets.map((b) => {
-      const isGoal = GOAL_CATEGORY_IDS.has(b.categoryId)
-      let spent
-      if (b.categoryId === 'goal-debt-payment') spent = monthDebtPayments
-      else if (b.categoryId === 'goal-savings') spent = monthSavingsContribution
-      else {
-        spent = monthTransactions
-          .filter((t) => t.type === 'expense' && !t.convertedToMsi && t.categoryId === b.categoryId)
-          .reduce((s, t) => s + t.amount, 0)
-      }
+      const spent = spentByCategoryId(monthTransactions, b.categoryId)
       const percent = b.limit > 0 ? (spent / b.limit) * 100 : 0
       return {
         categoryId: b.categoryId,
-        category: findBudgetCategory(b.categoryId),
-        isGoal,
+        category: findCategory(b.categoryId),
         limit: b.limit,
         spent,
         percent: Math.min(percent, 999),
-        status: isGoal ? getGoalStatus(percent) : getBudgetStatus(percent),
+        status: getBudgetStatus(percent),
         remaining: Math.max(b.limit - spent, 0),
       }
     })
-  }, [budgets, monthTransactions, monthDebtPayments, monthSavingsContribution, findBudgetCategory])
+  }, [budgets, monthTransactions, findCategory])
 
   // Versión histórica de budgetProgress para cualquier mes pasado (offset > 0
   // meses atrás) — el límite mostrado es siempre el ACTUAL de cada categoría
@@ -416,34 +520,21 @@ export function FinanceProvider({ children, store: providedStore }) {
   const getBudgetProgressForOffset = useCallback(
     (offset) => {
       const txs = transactions.filter((t) => isInMonth(t.date, offset))
-      const debtPayments = sumBy(txs, 'debt_payment')
-      const savings = txs
-        .filter((t) => t.type === 'saving_movement')
-        .reduce((s, t) => s + (t.direction === 'retiro' ? -t.amount : t.amount), 0)
       return budgets.map((b) => {
-        const isGoal = GOAL_CATEGORY_IDS.has(b.categoryId)
-        let spent
-        if (b.categoryId === 'goal-debt-payment') spent = debtPayments
-        else if (b.categoryId === 'goal-savings') spent = savings
-        else {
-          spent = txs
-            .filter((t) => t.type === 'expense' && !t.convertedToMsi && t.categoryId === b.categoryId)
-            .reduce((s, t) => s + t.amount, 0)
-        }
+        const spent = spentByCategoryId(txs, b.categoryId)
         const percent = b.limit > 0 ? (spent / b.limit) * 100 : 0
         return {
           categoryId: b.categoryId,
-          category: findBudgetCategory(b.categoryId),
-          isGoal,
+          category: findCategory(b.categoryId),
           limit: b.limit,
           spent,
           percent: Math.min(percent, 999),
-          status: isGoal ? getGoalStatus(percent) : getBudgetStatus(percent),
+          status: getBudgetStatus(percent),
           remaining: Math.max(b.limit - spent, 0),
         }
       })
     },
-    [transactions, budgets, findBudgetCategory]
+    [transactions, budgets, findCategory]
   )
 
   // -- Recurring bills: configured once, confirmed manually every period ----
@@ -483,10 +574,7 @@ export function FinanceProvider({ children, store: providedStore }) {
       })
     })
     budgetProgress.forEach((b) => {
-      // Las metas de deuda/ahorro no generan alertas de "presupuesto
-      // superado" — ahí superar el objetivo es buena noticia, y no haberlo
-      // alcanzado a medio mes no es urgente como sí lo es un gasto real.
-      if (b.isGoal || b.status === 'ok') return
+      if (b.status === 'ok') return
       list.push({
         id: `alert-budget-${b.categoryId}`,
         kind: 'budget',
@@ -539,27 +627,26 @@ export function FinanceProvider({ children, store: providedStore }) {
   }, [notifications])
 
   // -- Actions --------------------------------------------------------
-  const addExpense = useCallback(({ amount, categoryId, subcategoryId, accountId, note, date }) => {
-    const tx = {
-      id: nextLocalId('exp'),
-      type: 'expense',
-      amount: Number(amount),
-      categoryId,
-      subcategoryId: subcategoryId || null,
-      accountId,
-      note: note?.trim() || findCategoryLabel(categoryId),
-      date: date ? new Date(date) : new Date(),
-    }
-    setTransactions((prev) => [tx, ...prev])
-    setAccounts((prev) =>
-      prev.map((acc) => {
-        if (acc.id !== accountId) return acc
-        if (acc.type === 'credito') return { ...acc, used: acc.used + Number(amount) }
-        return { ...acc, balance: acc.balance - Number(amount) }
-      })
-    )
-    return tx
-  }, [])
+  const addExpense = useCallback(
+    ({ amount, categoryId, subcategoryId, accountId, counterAccountId, note, date }) => {
+      const tx = {
+        id: nextLocalId('exp'),
+        type: 'expense',
+        amount: Number(amount),
+        categoryId,
+        subcategoryId: subcategoryId || null,
+        accountId,
+        counterAccountId: counterAccountId || null,
+        note: note?.trim() || findCategoryLabel(categoryId),
+        date: date ? new Date(date) : new Date(),
+        createdBy: authUser?.uid || null,
+      }
+      setTransactions((prev) => [tx, ...prev])
+      setAccounts((prev) => applyExpenseEffect(prev, accountId, Number(amount), 1, counterAccountId))
+      return tx
+    },
+    [authUser]
+  )
 
   function findCategoryLabel(id) {
     return getCategory(id).label
@@ -599,8 +686,7 @@ export function FinanceProvider({ children, store: providedStore }) {
           type: 'income',
           incomeSourceId: profile.id,
           payMode,
-          hours: payMode === 'hours' ? Number(data.hours) : undefined,
-          hourlyRate: payMode === 'hours' ? Number(data.hourlyRate) : undefined,
+          ...(payMode === 'hours' && { hours: Number(data.hours), hourlyRate: Number(data.hourlyRate) }),
           amount,
           accountId,
           note: note?.trim() || profile.label,
@@ -617,6 +703,7 @@ export function FinanceProvider({ children, store: providedStore }) {
           date: date ? new Date(date) : new Date(),
         }
       }
+      tx.createdBy = authUser?.uid || null
       setTransactions((prev) => [tx, ...prev])
       setAccounts((prev) =>
         prev.map((acc) => {
@@ -626,7 +713,7 @@ export function FinanceProvider({ children, store: providedStore }) {
       )
       return tx
     },
-    [findIncomeProfile]
+    [findIncomeProfile, authUser]
   )
 
   const addIncomeProfile = useCallback((profile) => {
@@ -675,12 +762,20 @@ export function FinanceProvider({ children, store: providedStore }) {
     return acc
   }, [])
 
+  // Corrección directa y silenciosa de los datos de una cuenta ya creada
+  // (nombre, saldo, usado/límite, meta) — sin transacción ni historial, a
+  // diferencia de "Ajustar saldo" (addBalanceAdjustment), que sí registra un
+  // movimiento visible en Disponible este mes.
+  const updateAccount = useCallback((accountId, patch) => {
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, ...patch } : a)))
+  }, [])
+
   // Mueve dinero hacia (depósito) o desde (retiro) una cuenta de ahorro. Es
   // una transacción propia (`saving_movement`), no un ingreso ni un gasto —
   // así no distorsiona monthIncome/monthExpenses, igual que ya pasa con los
   // pagos de deuda.
   const registerSavingMovement = useCallback(
-    ({ accountId, counterAccountId, amount, direction, note, date }) => {
+    ({ accountId, counterAccountId, amount, direction, note, date, categoryId }) => {
       const value = Number(amount)
       const isDeposit = direction !== 'retiro'
 
@@ -708,15 +803,17 @@ export function FinanceProvider({ children, store: providedStore }) {
         type: 'saving_movement',
         accountId,
         counterAccountId: counterAccountId || null,
+        categoryId,
         amount: value,
         direction: isDeposit ? 'deposito' : 'retiro',
         note: note?.trim() || (isDeposit ? 'Depósito a ahorro' : 'Retiro de ahorro'),
         date: date ? new Date(date) : new Date(),
+        createdBy: authUser?.uid || null,
       }
       setTransactions((prev) => [tx, ...prev])
       return tx
     },
-    []
+    [authUser]
   )
 
   // Corrige el saldo de una cuenta (débito/efectivo) para "partir de un punto
@@ -740,13 +837,29 @@ export function FinanceProvider({ children, store: providedStore }) {
       amount: signedAmount,
       note: note?.trim() || 'Ajuste de saldo',
       date: date ? new Date(date) : new Date(),
+      createdBy: authUser?.uid || null,
     }
     setTransactions((prev) => [tx, ...prev])
     return tx
-  }, [])
+  }, [authUser])
+
+  // Revierte un ajuste de saldo — resta de la cuenta el mismo monto firmado
+  // que addBalanceAdjustment le sumó.
+  const deleteBalanceAdjustment = useCallback(
+    (transactionId) => {
+      const tx = transactions.find((t) => t.id === transactionId)
+      if (!tx || tx.type !== 'adjustment') return
+      setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
+      setAccounts((prev) =>
+        prev.map((acc) => (acc.id === tx.accountId ? { ...acc, balance: acc.balance - tx.amount } : acc))
+      )
+    },
+    [transactions]
+  )
 
   const registerDebtPayment = useCallback((debtId, amount, accountId) => {
     const value = Number(amount)
+    const categoryId = debts.find((d) => d.id === debtId)?.categoryId || null
     setDebts((prev) =>
       prev.map((d) => {
         if (d.id !== debtId) return d
@@ -765,26 +878,122 @@ export function FinanceProvider({ children, store: providedStore }) {
         return { ...d, remainingBalance }
       })
     )
+    const payDate = new Date()
+    const txId = nextLocalId('pay')
     setTransactions((prev) => [
       {
-        id: nextLocalId('pay'),
+        id: txId,
         type: 'debt_payment',
         debtId,
+        categoryId,
         amount: value,
         accountId,
         note: 'Pago de deuda',
-        date: new Date(),
+        date: payDate,
+        createdBy: authUser?.uid || null,
       },
       ...prev,
     ])
-    setAccounts((prev) =>
-      prev.map((acc) => {
-        if (acc.id !== accountId) return acc
-        if (acc.type === 'credito') return { ...acc, used: Math.max(acc.used - value, 0) }
-        return { ...acc, balance: acc.balance - value }
-      })
-    )
+    setAccounts((prev) => applyDebtPaymentEffect(prev, accountId, value, 1))
+    setDebtConfirmations((prev) => [
+      ...prev,
+      { debtId, period: periodKey(), transactionId: txId, amount: value, date: payDate },
+    ])
+  }, [debts, authUser])
+
+  const updateDebt = useCallback((debtId, updates) => {
+    setDebts((prev) => prev.map((d) => (d.id === debtId ? { ...d, ...updates } : d)))
   }, [])
+
+  // Edita una transacción ya registrada — gasto normal o pago de deuda.
+  // No se permite tocar transacciones convertidas a MSI (desincronizaría la
+  // deuda MSI que generaron) ni reasignar un pago de deuda a otra deuda.
+  const updateTransaction = useCallback(
+    (transactionId, updates) => {
+      const old = transactions.find((t) => t.id === transactionId)
+      if (!old) return
+      if (old.type === 'expense') {
+        if (old.convertedToMsi) return
+        const nextAmount = updates.amount != null ? Number(updates.amount) : old.amount
+        const nextAccountId = updates.accountId || old.accountId
+        const next = {
+          ...old,
+          ...updates,
+          amount: nextAmount,
+          accountId: nextAccountId,
+          date: updates.date ? new Date(updates.date) : old.date,
+        }
+        setTransactions((prev) => prev.map((t) => (t.id === transactionId ? next : t)))
+        setAccounts((prev) => {
+          const reverted = applyExpenseEffect(prev, old.accountId, old.amount, -1, old.counterAccountId)
+          return applyExpenseEffect(reverted, nextAccountId, nextAmount, 1, old.counterAccountId)
+        })
+      } else if (old.type === 'debt_payment') {
+        const nextAmount = updates.amount != null ? Number(updates.amount) : old.amount
+        const nextAccountId = updates.accountId || old.accountId
+        const nextDate = updates.date ? new Date(updates.date) : old.date
+        const delta = nextAmount - old.amount
+        const next = { ...old, ...updates, debtId: old.debtId, amount: nextAmount, accountId: nextAccountId, date: nextDate }
+        setTransactions((prev) => prev.map((t) => (t.id === transactionId ? next : t)))
+        setDebts((prev) =>
+          prev.map((d) => (d.id === old.debtId ? { ...d, remainingBalance: Math.max(d.remainingBalance - delta, 0) } : d))
+        )
+        setAccounts((prev) => {
+          const reverted = applyDebtPaymentEffect(prev, old.accountId, old.amount, -1)
+          return applyDebtPaymentEffect(reverted, nextAccountId, nextAmount, 1)
+        })
+        if (updates.date) {
+          setDebtConfirmations((prev) =>
+            prev.map((c) =>
+              c.transactionId === transactionId ? { ...c, period: periodKey(nextDate), amount: nextAmount } : c
+            )
+          )
+        } else if (updates.amount != null) {
+          setDebtConfirmations((prev) =>
+            prev.map((c) => (c.transactionId === transactionId ? { ...c, amount: nextAmount } : c))
+          )
+        }
+      }
+    },
+    [transactions]
+  )
+
+  // Elimina una transacción ya registrada, revirtiendo todos sus efectos:
+  // saldo de cuenta, saldo de la deuda (+cuota/fechas si era MSI), y la
+  // confirmación mensual (recurrente o pago de deuda) que la haya generado.
+  const deleteTransaction = useCallback(
+    (transactionId) => {
+      const tx = transactions.find((t) => t.id === transactionId)
+      if (!tx) return
+      if (tx.type === 'expense') {
+        if (tx.convertedToMsi) return
+        setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
+        setAccounts((prev) => applyExpenseEffect(prev, tx.accountId, tx.amount, -1, tx.counterAccountId))
+        setRecurringConfirmations((prev) => prev.filter((c) => c.transactionId !== transactionId))
+      } else if (tx.type === 'debt_payment') {
+        setTransactions((prev) => prev.filter((t) => t.id !== transactionId))
+        setAccounts((prev) => applyDebtPaymentEffect(prev, tx.accountId, tx.amount, -1))
+        setDebts((prev) =>
+          prev.map((d) => {
+            if (d.id !== tx.debtId) return d
+            const remainingBalance = Math.min(d.remainingBalance + tx.amount, d.totalAmount)
+            if (d.kind === 'msi') {
+              return {
+                ...d,
+                remainingBalance,
+                installmentsPaid: Math.max((d.installmentsPaid || 0) - 1, 0),
+                dueDate: addMonths(d.dueDate, -1),
+                cutDate: addMonths(d.cutDate, -1),
+              }
+            }
+            return { ...d, remainingBalance }
+          })
+        )
+        setDebtConfirmations((prev) => prev.filter((c) => c.transactionId !== transactionId))
+      }
+    },
+    [transactions]
+  )
 
   const addExpenseDeferred = useCallback(
     ({ amount, months, interestFree, monthlyRate, categoryId, subcategoryId, accountId, note, date }) => {
@@ -902,6 +1111,12 @@ export function FinanceProvider({ children, store: providedStore }) {
     setBudgets((prev) => prev.filter((b) => b.categoryId !== categoryId))
   }, [])
 
+  // Techo total del presupuesto del mes — un solo valor vigente (no se
+  // versiona por mes, igual que los límites por categoría).
+  const setBudgetTotalLimit = useCallback((value) => {
+    setBudgetTotalLimitState(value === '' || value == null ? null : Number(value))
+  }, [])
+
   const addCategory = useCallback((category) => {
     const cat = {
       id: nextLocalId('cat'),
@@ -926,7 +1141,6 @@ export function FinanceProvider({ children, store: providedStore }) {
     debts,
     budgets,
     allCategories,
-    budgetableCategories,
     customCategories,
     findCategory,
 
@@ -947,6 +1161,8 @@ export function FinanceProvider({ children, store: providedStore }) {
     upcomingPayments,
     budgetProgress,
     getBudgetProgressForOffset,
+    budgetTotalLimit,
+    setBudgetTotalLimit,
 
     incomeProfiles,
     findIncomeProfile,
@@ -970,9 +1186,14 @@ export function FinanceProvider({ children, store: providedStore }) {
     addExpenseDeferred,
     convertExpenseToMSI,
     addAccount,
+    updateAccount,
     registerDebtPayment,
+    updateDebt,
+    updateTransaction,
+    deleteTransaction,
     registerSavingMovement,
     addBalanceAdjustment,
+    deleteBalanceAdjustment,
     upsertBudget,
     removeBudget,
     addCategory,

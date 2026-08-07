@@ -9,11 +9,12 @@ import { useFinance } from '../../context/FinanceContext'
 
 // mode: { type: 'create' } | { type: 'edit', budget }
 export function BudgetModal({ mode, onClose }) {
-  const { budgetableCategories, budgets, upsertBudget, removeBudget, addCategory } = useFinance()
+  const { allCategories, budgets, upsertBudget, removeBudget, addCategory } = useFinance()
   const isEdit = mode?.type === 'edit'
-  const availableCategories = budgetableCategories.filter(
+  const availableCategories = allCategories.filter(
     (c) => isEdit || !budgets.some((b) => b.categoryId === c.id)
   )
+  const noAvailableCategories = !isEdit && availableCategories.length === 0
 
   const [categoryId, setCategoryId] = useState('')
   const [limit, setLimit] = useState('')
@@ -21,11 +22,12 @@ export function BudgetModal({ mode, onClose }) {
 
   useEffect(() => {
     if (!mode) return
-    setAddingCategory(false)
     if (isEdit) {
+      setAddingCategory(false)
       setCategoryId(mode.budget.categoryId)
       setLimit(String(mode.budget.limit))
     } else {
+      setAddingCategory(availableCategories.length === 0)
       setCategoryId(availableCategories[0]?.id || '')
       setLimit('')
     }
@@ -48,18 +50,24 @@ export function BudgetModal({ mode, onClose }) {
   return (
     <Modal open={Boolean(mode)} onClose={onClose} title={isEdit ? 'Editar presupuesto' : 'Crear presupuesto'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Select
-          label="Categoría"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          disabled={isEdit}
-        >
-          {availableCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </Select>
+        {noAvailableCategories ? (
+          <p className="text-xs text-muted">
+            Ya tienes presupuesto para todas tus categorías. Crea una nueva para agregar más:
+          </p>
+        ) : (
+          <Select
+            label="Categoría"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            disabled={isEdit}
+          >
+            {availableCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+        )}
 
         {!isEdit &&
           (addingCategory ? (

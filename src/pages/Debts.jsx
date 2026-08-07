@@ -7,10 +7,12 @@ import { SegmentedTabs } from '../components/ui/SegmentedTabs'
 import { DebtCard } from '../components/finance/DebtCard'
 import { MoneyText } from '../components/finance/MoneyText'
 import { RegisterPaymentModal } from '../components/modals/RegisterPaymentModal'
+import { DebtModal } from '../components/modals/DebtModal'
 
 export default function Debts() {
   const { upcomingPayments, totalDebt } = useFinance()
   const [selectedDebt, setSelectedDebt] = useState(null)
+  const [editingDebt, setEditingDebt] = useState(null)
   const [tab, setTab] = useState('all')
 
   const filtered = useMemo(() => {
@@ -54,12 +56,13 @@ export default function Debts() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((debt) => (
-            <DebtCard key={debt.id} debt={debt} onRegisterPayment={setSelectedDebt} />
+            <DebtCard key={debt.id} debt={debt} onRegisterPayment={setSelectedDebt} onEdit={setEditingDebt} />
           ))}
         </div>
       )}
 
       <RegisterPaymentModal debt={selectedDebt} onClose={() => setSelectedDebt(null)} />
+      <DebtModal debt={editingDebt} onClose={() => setEditingDebt(null)} />
     </div>
   )
 }

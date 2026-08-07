@@ -1,4 +1,4 @@
-import { Percent, CalendarClock, CalendarCheck, Layers } from 'lucide-react'
+import { Percent, CalendarClock, CalendarCheck, Layers, Pencil } from 'lucide-react'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { ProgressBar } from '../ui/ProgressBar'
@@ -13,7 +13,7 @@ const URGENCY_VARIANT = {
   overdue: 'negative',
 }
 
-export function DebtCard({ debt, onRegisterPayment }) {
+export function DebtCard({ debt, onRegisterPayment, onEdit }) {
   const isMsi = debt.kind === 'msi'
   const paid = debt.totalAmount - debt.remainingBalance
   const percentPaid = debt.totalAmount > 0 ? (paid / debt.totalAmount) * 100 : 0
@@ -33,9 +33,21 @@ export function DebtCard({ debt, onRegisterPayment }) {
           </div>
           <p className="text-xs text-muted">{debt.type}</p>
         </div>
-        <Badge variant={settled ? 'positive' : URGENCY_VARIANT[debt.urgency]} className="shrink-0">
-          {settled ? 'Liquidada' : URGENCY_LABELS[debt.urgency]}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Badge variant={settled ? 'positive' : URGENCY_VARIANT[debt.urgency]}>
+            {settled ? 'Liquidada' : URGENCY_LABELS[debt.urgency]}
+          </Badge>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(debt)}
+              aria-label={`Editar ${debt.name}`}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface2 hover:text-ink"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 flex items-end justify-between">
@@ -85,9 +97,15 @@ export function DebtCard({ debt, onRegisterPayment }) {
       </div>
 
       {!settled && (
-        <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={() => onRegisterPayment(debt)}>
-          Registrar pago
-        </Button>
+        debt.confirmed ? (
+          <Badge variant="positive" className="mt-4 w-full justify-center py-2">
+            Pago confirmado este mes
+          </Badge>
+        ) : (
+          <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={() => onRegisterPayment(debt)}>
+            Registrar pago
+          </Button>
+        )
       )}
     </Card>
   )

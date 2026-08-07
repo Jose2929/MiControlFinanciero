@@ -1,14 +1,24 @@
-import { ArrowUpRight, HandCoins, Layers } from 'lucide-react'
+import { ArrowUpRight, HandCoins, Layers, Pencil } from 'lucide-react'
 import { formatMoney } from '../../lib/format'
 import { categoryColorValue } from '../../lib/categories'
 import { Badge } from '../ui/Badge'
 import { cn } from '../../lib/cn'
 
-export function TransactionRow({ transaction, category, subcategory, account, sourceLabel, onConvertToMsi }) {
+export function TransactionRow({
+  transaction,
+  category,
+  subcategory,
+  account,
+  sourceLabel,
+  author,
+  onConvertToMsi,
+  onEdit,
+}) {
   const isIncome = transaction.type === 'income'
   const isDebtPayment = transaction.type === 'debt_payment'
   const converted = Boolean(transaction.convertedToMsi)
   const canConvert = transaction.type === 'expense' && !converted && Boolean(onConvertToMsi)
+  const canEdit = (transaction.type === 'expense' || isDebtPayment) && !converted && Boolean(onEdit)
 
   const Icon = isIncome ? ArrowUpRight : isDebtPayment ? HandCoins : category?.icon
   const iconColor = isIncome ? '#10B981' : isDebtPayment ? '#F59E0B' : categoryColorValue(category)
@@ -16,8 +26,10 @@ export function TransactionRow({ transaction, category, subcategory, account, so
 
   const subtitle = [
     sourceLabel,
+    isDebtPayment && category ? category.label : null,
     subcategory ? `${category?.label} · ${subcategory.label}` : null,
     account?.name || 'Efectivo',
+    author?.name || author?.email || null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -68,6 +80,17 @@ export function TransactionRow({ transaction, category, subcategory, account, so
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface2 hover:text-brand-400"
         >
           <Layers className="h-4 w-4" />
+        </button>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(transaction)}
+          aria-label="Editar transacción"
+          title="Editar o eliminar"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface2 hover:text-ink"
+        >
+          <Pencil className="h-4 w-4" />
         </button>
       )}
     </div>

@@ -43,7 +43,12 @@ export default function Budgets() {
   const totalSpent = progress.reduce((s, b) => s + b.spent, 0)
   const primaryLimit = budgetTotalLimit ?? totalLimit
   const primaryPercent = primaryLimit > 0 ? (totalSpent / primaryLimit) * 100 : 0
-  const remainingToAllocate = budgetTotalLimit != null ? budgetTotalLimit - totalLimit : null
+  // Redondeado a pesos enteros antes de restar — si no, dos montos que se ven
+  // idénticos en pantalla (cada uno ya redondeado por separado con
+  // formatMoney) pueden diferir en centavos y mostrar "Falta $1 por asignar"
+  // aunque en la práctica ya esté todo asignado.
+  const remainingToAllocate =
+    budgetTotalLimit != null ? Math.round(budgetTotalLimit) - Math.round(totalLimit) : null
 
   function commitTotalLimit() {
     setBudgetTotalLimit(totalLimitDraft)
@@ -160,7 +165,7 @@ export default function Budgets() {
         <div className="mt-4 border-t border-line pt-4">
           <p className="text-xs text-muted">
             <MoneyText amount={totalLimit} className="text-xs" variant="muted" /> asignado en categorías
-            {remainingToAllocate != null && (
+            {remainingToAllocate != null && remainingToAllocate !== 0 && (
               <>
                 {' · '}
                 {remainingToAllocate < 0 ? (

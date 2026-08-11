@@ -46,6 +46,9 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState('checking') // checking | signed-out | signed-in
   const [pendingProvider, setPendingProvider] = useState(null) // 'email' | 'google' | null
   const [error, setError] = useState(null)
+  // Aviso persistente que sobrevive al cierre de sesión forzado (p.ej. sesión
+  // expirada) para mostrarse en Login después del redirect automático.
+  const [notice, setNotice] = useState(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -98,8 +101,13 @@ export function AuthProvider({ children }) {
     }
   }
 
-  function signOut() {
+  function signOut(reason) {
+    if (reason) setNotice(reason)
     return firebaseSignOut(auth)
+  }
+
+  function clearNotice() {
+    setNotice(null)
   }
 
   const value = {
@@ -107,11 +115,13 @@ export function AuthProvider({ children }) {
     status,
     pendingProvider,
     error,
+    notice,
     isAuthenticated: status === 'signed-in',
     signIn,
     signInWithGoogle,
     register,
     signOut,
+    clearNotice,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

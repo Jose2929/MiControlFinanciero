@@ -91,13 +91,20 @@ export function createFirebaseRealtimeStore({
       await set(ref(db, path), obj)
     },
     // Se suscribe a cambios en vivo; devuelve la función para cancelar.
-    subscribe(onChange) {
+    // `onError` recibe errores del listener (p.ej. permisos denegados por
+    // reglas de seguridad o un token de auth inválido) — sin esto, Firebase
+    // los descarta en silencio y la app nunca se entera de que dejó de leer.
+    subscribe(onChange, onError) {
       if (!onValue) {
         throw new Error('subscribe() requiere que se inyecte onValue de firebase/database.')
       }
-      return onValue(ref(db, path), (snapshot) => {
-        onChange(snapshot.exists() ? snapshot.val() : null)
-      })
+      return onValue(
+        ref(db, path),
+        (snapshot) => {
+          onChange(snapshot.exists() ? snapshot.val() : null)
+        },
+        onError
+      )
     },
   }
 }

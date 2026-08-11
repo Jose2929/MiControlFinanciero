@@ -52,6 +52,13 @@ function applyExpenseEffect(accounts, accountId, amount, sign, counterAccountId)
   })
 }
 
+// Detecta errores de permisos/auth (token inválido o expirado, o ya no
+// perteneces al hogar) para forzar cierre de sesión en vez de solo reintentar
+// — el código estándar de Firebase RTDB para una regla de seguridad denegada.
+function isAuthLikeError(err) {
+  return err?.code === 'PERMISSION_DENIED'
+}
+
 // Igual que applyExpenseEffect pero para pagos de deuda — polaridad opuesta
 // en tarjetas de crédito (un pago BAJA el saldo usado, no lo sube).
 function applyDebtPaymentEffect(accounts, accountId, amount, sign) {
@@ -63,7 +70,7 @@ function applyDebtPaymentEffect(accounts, accountId, amount, sign) {
 }
 
 export function FinanceProvider({ children, store: providedStore }) {
-  const { user: authUser } = useAuth()
+  const { user: authUser, signOut: authSignOut } = useAuth()
   const { householdId } = useHousehold()
 
   // Un hogar real siempre arranca limpio (sin el dataset de ejemplo).
@@ -175,23 +182,33 @@ export function FinanceProvider({ children, store: providedStore }) {
     setRemoteAhead(false)
     setSaveState('idle')
 
-    const unsubscribe = store.subscribe((raw) => {
-      const data = raw ? deserializeProfile(raw) : null
-      if (data) {
-        if (!dirtyRef.current) {
-          applyProfile(data, { remote: true })
-          pendingRemoteRef.current = null
-          setRemoteAhead(false)
-          setLastSavedAt(data.updatedAt || null)
+    const unsubscribe = store.subscribe(
+      (raw) => {
+        const data = raw ? deserializeProfile(raw) : null
+        if (data) {
+          if (!dirtyRef.current) {
+            applyProfile(data, { remote: true })
+            pendingRemoteRef.current = null
+            setRemoteAhead(false)
+            setLastSavedAt(data.updatedAt || null)
+          } else {
+            pendingRemoteRef.current = data
+            setRemoteAhead(true)
+          }
+        }
+        setHydrated(true)
+      },
+      (err) => {
+        console.error('No se pudo leer el perfil del hogar:', err)
+        if (isAuthLikeError(err)) {
+          authSignOut('Tu sesión expiró o perdiste acceso a este hogar. Vuelve a iniciar sesión.')
         } else {
-          pendingRemoteRef.current = data
-          setRemoteAhead(true)
+          setSaveState('error')
         }
       }
-      setHydrated(true)
-    })
+    )
     return unsubscribe
-  }, [store, applyProfile])
+  }, [store, applyProfile, authSignOut])
 
   // Marca "cambios sin guardar" cuando cambia cualquier slice serializable.
   // Se ignoran: el primer render posterior a la hidratación (dirtyGuard) y
@@ -200,6 +217,11 @@ export function FinanceProvider({ children, store: providedStore }) {
     if (!hydrated) return
     if (remoteApplyRef.current) {
       remoteApplyRef.current = false
+      // Cualquier render de hidratación (con datos remotos o vacío) cuenta
+      // como "el primer render" — si no se marca aquí también, la PRÓXIMA
+      // edición real (la primera del usuario) cae en la guarda de abajo y se
+      // descarta en silencio, y solo la segunda edición queda marcada dirty.
+      dirtyGuard.current = true
       return
     }
     if (!dirtyGuard.current) {
@@ -246,11 +268,14 @@ export function FinanceProvider({ children, store: providedStore }) {
         return snapshot
       } catch (err) {
         console.error('No se pudo guardar el perfil:', err)
+        if (isAuthLikeError(err)) {
+          authSignOut('Tu sesión expiró o perdiste acceso a este hogar. Vuelve a iniciar sesión.')
+        }
         setSaveState('error')
         throw err
       }
     },
-    [buildSnapshot, store]
+    [buildSnapshot, store, authSignOut]
   )
 
   // Guardado automático: cada edición nueva reinicia un pequeño debounce; al
@@ -680,7 +705,9 @@ export function FinanceProvider({ children, store: providedStore }) {
       } else if (profile.mode === 'hourly') {
         const payMode = data.payMode === 'hours' ? 'hours' : 'total'
         const amount =
-          payMode === 'hours' ? Number(data.hours) * Number(data.hourlyRate) : Number(data.amount)
+          payMode === 'hours'
+            ? Math.round(Number(data.hours) * Number(data.hourlyRate))
+            : Number(data.amount)
         tx = {
           id: nextLocalId('inc'),
           type: 'income',

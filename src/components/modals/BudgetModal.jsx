@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Minus } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -19,9 +19,18 @@ export function BudgetModal({ mode, onClose }) {
   const [categoryId, setCategoryId] = useState('')
   const [limit, setLimit] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
+  const [adjustAmount, setAdjustAmount] = useState('')
+
+  function applyAdjust(sign) {
+    const delta = Number(adjustAmount) || 0
+    if (!delta) return
+    setLimit((prev) => String(Math.max((Number(prev) || 0) + sign * delta, 0)))
+    setAdjustAmount('')
+  }
 
   useEffect(() => {
     if (!mode) return
+    setAdjustAmount('')
     if (isEdit) {
       setAddingCategory(false)
       setCategoryId(mode.budget.categoryId)
@@ -98,6 +107,26 @@ export function BudgetModal({ mode, onClose }) {
           onChange={(e) => setLimit(e.target.value)}
           required
         />
+
+        {isEdit && (
+          <div className="flex items-end gap-2">
+            <Input
+              label="Ajustar por"
+              type="number"
+              min="0"
+              placeholder="Cantidad"
+              value={adjustAmount}
+              onChange={(e) => setAdjustAmount(e.target.value)}
+              containerClassName="flex-1"
+            />
+            <Button type="button" variant="secondary" onClick={() => applyAdjust(-1)} aria-label="Restar al límite">
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => applyAdjust(1)} aria-label="Sumar al límite">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         <Button type="submit" size="lg" className="w-full">
           Guardar presupuesto

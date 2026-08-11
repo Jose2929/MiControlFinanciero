@@ -26,7 +26,9 @@ export default function Accounts() {
           <div key={account.id} className="animate-fade-in-up">
             <AccountCard
               account={account}
-              onRegisterMovement={account.type === 'ahorro' ? setSavingsAccount : undefined}
+              onRegisterMovement={
+                account.type === 'ahorro' || account.type === 'debito' ? setSavingsAccount : undefined
+              }
               onEdit={(a) => setModalMode({ type: 'edit', account: a })}
             />
           </div>

@@ -49,12 +49,23 @@ export function HouseholdProvider({ children }) {
   // que se generaba y lo perdía al recargar la página.
   useEffect(() => {
     if (!householdId) return
-    const unsubMeta = onValue(ref(db, `households/${householdId}/meta`), (snap) => setMeta(snap.val()))
-    const unsubMembers = onValue(ref(db, `households/${householdId}/members`), (snap) =>
-      setMembers(snap.val() || {})
+    // Sin el tercer argumento (callback de error), un problema de permisos
+    // cancela la suscripción en silencio total — ni consola ni UI se enteran.
+    const onSubscribeError = (err) => console.error('No se pudo leer datos del hogar:', err)
+    const unsubMeta = onValue(
+      ref(db, `households/${householdId}/meta`),
+      (snap) => setMeta(snap.val()),
+      onSubscribeError
     )
-    const unsubInviteCode = onValue(ref(db, `households/${householdId}/inviteCode`), (snap) =>
-      setInviteCode(snap.val())
+    const unsubMembers = onValue(
+      ref(db, `households/${householdId}/members`),
+      (snap) => setMembers(snap.val() || {}),
+      onSubscribeError
+    )
+    const unsubInviteCode = onValue(
+      ref(db, `households/${householdId}/inviteCode`),
+      (snap) => setInviteCode(snap.val()),
+      onSubscribeError
     )
     return () => {
       unsubMeta()

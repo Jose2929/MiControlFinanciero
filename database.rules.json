@@ -23,6 +23,7 @@
           ".write": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid + '/role').val() === 'owner'"
         },
         "members": {
+          ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
           "$uid": {
             ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
             ".write": "auth != null && auth.uid === $uid && (data.exists() || root.child('households/' + $hid + '/meta/createdBy').val() === auth.uid || root.child('households/' + $hid + '/inviteCode').val() === root.child('households/' + $hid + '/joinCodeUsed/' + auth.uid).val())"

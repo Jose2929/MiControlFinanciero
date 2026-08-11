@@ -9,6 +9,7 @@ import { formatMoney } from '../../lib/format'
 
 export function RegisterSavingMovementModal({ account, onClose }) {
   const { accounts, allCategories, registerSavingMovement } = useFinance()
+  const isSavings = account?.type === 'ahorro'
   const [direction, setDirection] = useState('deposito')
   const [amount, setAmount] = useState('')
   const [counterAccountId, setCounterAccountId] = useState('')
@@ -17,17 +18,26 @@ export function RegisterSavingMovementModal({ account, onClose }) {
   const [error, setError] = useState('')
 
   // Cuentas que pueden ser la contraparte: cualquier débito/efectivo/ahorro,
-  // excepto la propia cuenta de ahorro que se está moviendo. Las de crédito
-  // se excluyen — pagar hacia/desde una tarjeta de crédito con esta acción no
+  // excepto la propia cuenta que se está moviendo. Las de crédito se
+  // excluyen — pagar hacia/desde una tarjeta de crédito con esta acción no
   // aplica en este modelo (para deudas ya existe "Registrar pago").
   const counterOptions = accounts.filter((a) => a.id !== account?.id && a.type !== 'credito')
 
   useEffect(() => {
     if (account) {
-      setDirection('deposito')
+      const cashAccount = accounts.find((a) => a.type === 'efectivo' && a.id !== account.id)
+      if (account.type === 'ahorro') {
+        setDirection('deposito')
+        setCounterAccountId(counterOptions[0]?.id || '')
+        setCategoryId(allCategories.find((c) => c.id === 'goal-savings')?.id || allCategories[0]?.id || '')
+      } else {
+        // Débito: el caso común es "retirar efectivo" — precarga retiro
+        // hacia Efectivo para que solo haga falta capturar el monto.
+        setDirection('retiro')
+        setCounterAccountId(cashAccount?.id || counterOptions[0]?.id || '')
+        setCategoryId('')
+      }
       setAmount('')
-      setCounterAccountId(counterOptions[0]?.id || '')
-      setCategoryId(allCategories.find((c) => c.id === 'goal-savings')?.id || allCategories[0]?.id || '')
       setNote('')
       setError('')
     }
@@ -44,13 +54,13 @@ export function RegisterSavingMovementModal({ account, onClose }) {
       return
     }
     if (direction === 'retiro' && value > account.balance) {
-      setError('No puedes retirar más de lo que tienes ahorrado')
+      setError('No puedes retirar más de lo que tienes disponible')
       return
     }
     registerSavingMovement({
       accountId: account.id,
       counterAccountId: counterAccountId || null,
-      categoryId,
+      categoryId: isSavings ? categoryId : null,
       amount: value,
       direction,
       note,
@@ -63,7 +73,7 @@ export function RegisterSavingMovementModal({ account, onClose }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-xl bg-surface2 p-3.5 text-sm">
           <div className="flex justify-between text-muted">
-            <span>Ahorrado actualmente</span>
+            <span>{isSavings ? 'Ahorrado actualmente' : 'Saldo actual'}</span>
             <span className="font-semibold tabular-nums text-ink">{formatMoney(account.balance)}</span>
           </div>
           {account.goal > 0 && (
@@ -109,13 +119,15 @@ export function RegisterSavingMovementModal({ account, onClose }) {
           ))}
         </Select>
 
-        <Select label="Categoría" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          {allCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </Select>
+        {isSavings && (
+          <Select label="Categoría" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            {allCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+        )}
 
         <Input
           label="Nota (opcional)"

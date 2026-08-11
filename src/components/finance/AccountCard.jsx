@@ -101,6 +101,16 @@ export function AccountCard({ account, onRegisterMovement, onEdit }) {
           <div>
             <p className="text-xs text-white/60">Saldo disponible</p>
             <p className="text-2xl font-bold tabular-nums">{formatMoney(account.balance)}</p>
+            {account.type === 'debito' && onRegisterMovement && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2 w-full bg-white/15 text-white hover:bg-white/25"
+                onClick={() => onRegisterMovement(account)}
+              >
+                Retirar efectivo
+              </Button>
+            )}
           </div>
         )}
       </div>

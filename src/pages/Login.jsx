@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet2, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Wallet2, Mail, Lock, User, Eye, EyeOff, AlertCircle, Info } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -10,12 +10,16 @@ import { GoogleIcon } from '../components/GoogleIcon'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { signIn, signInWithGoogle, register, pendingProvider, error } = useAuth()
+  const { signIn, signInWithGoogle, register, pendingProvider, error, notice, clearNotice } = useAuth()
   const [mode, setMode] = useState('signin')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  // El aviso (p.ej. "tu sesión expiró") solo debe verse una vez, en esta
+  // visita a Login — se limpia al salir de la pantalla.
+  useEffect(() => () => clearNotice(), [clearNotice])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -63,6 +67,13 @@ export default function Login() {
             value={mode}
             onChange={setMode}
           />
+
+          {notice && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2.5 text-sm text-warning">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>{notice}</span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-negative-soft px-3 py-2.5 text-sm text-negative">

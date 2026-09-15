@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/parsed_transaction.dart';
@@ -31,15 +32,19 @@ class _NotificationDebugPageState extends State<NotificationDebugPage>
     _refreshAccessStatus();
     _bridge.events.listen((event) async {
       final parsed = _parserRegistry.parse(event);
-      debugPrint(
-        '[NotificationEvent] packageName=${event.packageName} '
-        'appName=${event.appName} title=${event.title} text=${event.text} '
-        'timestamp=${event.timestamp}',
-      );
-      debugPrint(
-        '[ParsedTransaction] amount=${parsed?.amount} type=${parsed?.type} '
-        'note=${parsed?.note}',
-      );
+      // Fase 16: no imprimir datos financieros reales en un log de
+      // release (ver mismo razonamiento en background_dispatcher.dart).
+      if (kDebugMode) {
+        debugPrint(
+          '[NotificationEvent] packageName=${event.packageName} '
+          'appName=${event.appName} title=${event.title} text=${event.text} '
+          'timestamp=${event.timestamp}',
+        );
+        debugPrint(
+          '[ParsedTransaction] amount=${parsed?.amount} type=${parsed?.type} '
+          'note=${parsed?.note}',
+        );
+      }
 
       // Fase 6: si logramos extraer un monto, revisar que no sea un
       // duplicado (p. ej. Android/Samsung disparando onNotificationPosted
@@ -52,7 +57,9 @@ class _NotificationDebugPageState extends State<NotificationDebugPage>
           scope: 'debug_list',
         );
         if (isDuplicate) {
-          debugPrint('[Deduplicator] duplicado ignorado: ${parsed.note}');
+          if (kDebugMode) {
+            debugPrint('[Deduplicator] duplicado ignorado: ${parsed.note}');
+          }
           return;
         }
       }

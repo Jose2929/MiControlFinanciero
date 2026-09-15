@@ -472,13 +472,36 @@ Solo diseño de interfaces que permitan añadir Wear OS después sin reescribir
 la app. No construir una app Wear OS completa. Aclarar D7 antes de diseñar
 esta fase a fondo.
 
-## Fase 16 — Seguridad y privacidad (revisión final)
+## Fase 16 — ✅ Revisada: seguridad y privacidad (revisión final)
 
 No enviar texto completo de notificaciones a Firebase ni guardarlo
 innecesariamente. No credenciales ni secretos en código. Revisar que los
 logs de desarrollo no impriman de forma persistente montos/comercios reales.
 Confirmar que las reglas de `database.rules.json` siguen siendo correctas
 tras cualquier nodo nuevo (p. ej. el de D5).
+
+**Auditoría (2026-09-14):**
+
+- **Secretos**: `google-services.json`/`firebase_options.dart` correctamente
+  en `.gitignore`; el único valor fijo en código (`googleServerClientId`)
+  es un Web Client ID de OAuth, público por diseño, no un secreto.
+- **`database.rules.json`**: sin cambios necesarios — D5 no creó ningún
+  nodo nuevo (el candidato vive solo en memoria hasta confirmarse), y
+  `TransactionWriter` escribe únicamente bajo `households/$hid/profile/...`,
+  ya cubierto por la regla existente de `profile`.
+- **Hallazgo corregido — texto crudo a Firebase**: `GenericParser` (usado
+  como fallback por Santander sin calibrar y de lleno por HSBC/PayPal/
+  Google Wallet, aún sin regex propio) ponía el texto completo de la
+  notificación como `note`, que podía llegar tal cual a Firebase si el
+  usuario no lo editaba antes de guardar. Se corrigió para dejar `note`
+  en `null` en ese fallback — la detección de monto/tipo no se ve
+  afectada.
+- **Hallazgo corregido — logs con datos reales**: varios `debugPrint`/
+  `Log.d` imprimían título/texto crudo o monto/nota ya parseados sin
+  protección, visibles en `adb logcat` incluso en un build de release.
+  Se protegieron con `kDebugMode` (Dart)/`BuildConfig.DEBUG` (Kotlin) —
+  verificado con un build release real: cero rastro de esos datos en
+  logcat tras disparar el flujo completo.
 
 ## Fase 17 — Pruebas
 

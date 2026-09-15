@@ -47,7 +47,11 @@ class NotificationListener : NotificationListenerService() {
         }
         val timestamp = sbn.postTime
 
-        Log.d(TAG, "packageName=$packageName appName=$appName title=$title text=$text timestamp=$timestamp")
+        // Fase 16: titulo/texto crudo son datos financieros reales del
+        // usuario — no deben quedar en logcat de un build de release.
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "packageName=$packageName appName=$appName title=$title text=$text timestamp=$timestamp")
+        }
 
         val event = mapOf(
             "packageName" to packageName,

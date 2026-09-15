@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -31,16 +32,25 @@ void backgroundNotificationDispatcher() {
 
     try {
       final event = NotificationEvent.fromMap(call.arguments as Map);
-      debugPrint(
-        '[Background] packageName=${event.packageName} title=${event.title} '
-        'text=${event.text}',
-      );
+      // Fase 16: título/texto crudo y monto/nota parseados son datos
+      // financieros reales del usuario — no deben quedar en el log de un
+      // build de release (adb logcat es legible con depuración USB). Al
+      // ser `kDebugMode` una constante de compilación, este bloque entero
+      // se elimina del build de release por tree-shaking.
+      if (kDebugMode) {
+        debugPrint(
+          '[Background] packageName=${event.packageName} title=${event.title} '
+          'text=${event.text}',
+        );
+      }
 
       final parsed = parserRegistry.parse(event);
-      debugPrint(
-        '[Background] parsed amount=${parsed?.amount} type=${parsed?.type} '
-        'isRegistrable=${parsed?.isRegistrable}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Background] parsed amount=${parsed?.amount} type=${parsed?.type} '
+          'isRegistrable=${parsed?.isRegistrable}',
+        );
+      }
 
       if (parsed == null || !parsed.isRegistrable) {
         debugPrint('[Background] no es un movimiento valido, se ignora');
@@ -64,7 +74,9 @@ void backgroundNotificationDispatcher() {
           ? '$amountText — ${parsed.note}'
           : amountText;
 
-      debugPrint('[Background] publicando notificacion propia: $title / $text');
+      if (kDebugMode) {
+        debugPrint('[Background] publicando notificacion propia: $title / $text');
+      }
       await channel.invokeMethod('postOwnNotification', {
         'title': title,
         'text': text,

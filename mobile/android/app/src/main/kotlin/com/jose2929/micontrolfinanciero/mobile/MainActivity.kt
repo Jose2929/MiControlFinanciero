@@ -55,7 +55,11 @@ class MainActivity : FlutterActivity() {
             "timestamp" to intent.getLongExtra(NotificationPoster.EXTRA_TIMESTAMP, 0L),
             "type" to intent.getStringExtra(NotificationPoster.EXTRA_TYPE)
         )
-        Log.d("MCF_MainActivity", "Movimiento a confirmar: $extras (isNewIntent=$isNewIntent)")
+        // Fase 16: $extras incluye monto/nota reales — no debe quedar en
+        // logcat de un build de release.
+        if (BuildConfig.DEBUG) {
+            Log.d("MCF_MainActivity", "Movimiento a confirmar: $extras (isNewIntent=$isNewIntent)")
+        }
         if (isNewIntent) {
             confirmMovementMethodChannel?.invokeMethod("showConfirmMovement", extras)
         } else {

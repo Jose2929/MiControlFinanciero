@@ -67,7 +67,12 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       title: 'MiControlFinanciero',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: Colors.black,
       ),
       home: const AuthGate(),
     );

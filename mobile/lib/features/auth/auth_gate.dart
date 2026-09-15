@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/pending_confirm_movement.dart';
 import '../../services/confirm_movement_channel.dart';
 import '../confirm/confirm_movement_page.dart';
-import '../home/home_shell.dart';
+import '../webview/pwa_webview_page.dart';
 import 'login_page.dart';
 
 /// Fase 8: decide qué pantalla mostrar según el estado de sesión de
@@ -66,7 +66,7 @@ class _SignedInGateState extends State<_SignedInGate> {
         if (pending != null) {
           return ConfirmMovementPage(movement: pending);
         }
-        return const HomeShell();
+        return const PwaWebViewPage();
       },
     );
   }

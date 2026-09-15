@@ -104,10 +104,6 @@ class MainActivity : FlutterActivity() {
                     "isNotificationAccessGranted" -> {
                         result.success(isNotificationAccessGranted())
                     }
-                    "postTestNotification" -> {
-                        NotificationPoster.postTest(this)
-                        result.success(null)
-                    }
                     else -> result.notImplemented()
                 }
             }
@@ -207,8 +203,7 @@ class MainActivity : FlutterActivity() {
     private fun MonitoredAppEntry.toMap(): Map<String, Any> = mapOf(
         "packageName" to packageName,
         "displayName" to displayName,
-        "enabled" to enabled,
-        "isDevTool" to isDevTool
+        "enabled" to enabled
     )
 
     private fun isNotificationAccessGranted(): Boolean {

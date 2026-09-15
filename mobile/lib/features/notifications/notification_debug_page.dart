@@ -167,11 +167,6 @@ class _NotificationDebugPageState extends State<NotificationDebugPage>
                   onPressed: _bridge.openNotificationListenerSettings,
                   child: const Text('Abrir ajustes de notificaciones'),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _bridge.postTestNotification,
-                  child: const Text('Enviar notificación de prueba'),
-                ),
               ],
             ),
           ),

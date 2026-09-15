@@ -55,9 +55,6 @@ class _MonitoredAppsPageState extends State<MonitoredAppsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bankApps = _apps.where((a) => !a.isDevTool).toList();
-    final devApps = _apps.where((a) => a.isDevTool).toList();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Apps monitoreadas')),
       floatingActionButton: FloatingActionButton(
@@ -69,19 +66,12 @@ class _MonitoredAppsPageState extends State<MonitoredAppsPage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  child: Text(
-                    'Bancos y billeteras',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (bankApps.isEmpty)
+                if (_apps.isEmpty)
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     child: Text('Ninguna. Toca + para agregar una app.'),
                   ),
-                for (final app in bankApps)
+                for (final app in _apps)
                   SwitchListTile(
                     title: Text(app.displayName),
                     subtitle: Text(app.packageName),
@@ -92,21 +82,6 @@ class _MonitoredAppsPageState extends State<MonitoredAppsPage> {
                       tooltip: 'Quitar',
                       onPressed: () => _remove(app),
                     ),
-                  ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  child: Text(
-                    'Herramientas de desarrollo',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                for (final app in devApps)
-                  SwitchListTile(
-                    title: Text(app.displayName),
-                    subtitle: Text(app.packageName),
-                    value: app.enabled,
-                    onChanged: (value) => _toggle(app, value),
                   ),
               ],
             ),

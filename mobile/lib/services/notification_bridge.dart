@@ -21,8 +21,4 @@ class NotificationBridge {
     );
     return granted ?? false;
   }
-
-  Future<void> postTestNotification() {
-    return _methodChannel.invokeMethod('postTestNotification');
-  }
 }

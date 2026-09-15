@@ -12,7 +12,6 @@ import android.os.Build
 // usado tanto por el boton de prueba (Fase 2) como por el flujo real de
 // "movimiento detectado" que corre desde el engine headless.
 object NotificationPoster {
-    private const val TEST_CHANNEL_ID = "mcf_test_channel"
     // No privado: NotificationListener lo usa para nunca reprocesar sus
     // propias notificaciones de "movimiento detectado" (evita un bucle
     // infinito de auto-retroalimentacion).
@@ -28,22 +27,6 @@ object NotificationPoster {
     const val EXTRA_TIMESTAMP = "mcf_timestamp"
     const val EXTRA_TYPE = "mcf_type"
     const val ACTION_CONFIRM_MOVEMENT = "confirm_movement"
-
-    fun postTest(context: Context) {
-        ensureChannel(context, TEST_CHANNEL_ID, "Pruebas MiControlFinanciero")
-
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val notification = Notification.Builder(context, TEST_CHANNEL_ID)
-            .setContentTitle("Cargo de prueba")
-            .setContentText("Compra por \$250.00 en Tienda de Prueba")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setAutoCancel(true)
-            .build()
-
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
-    }
 
     fun postDetectedMovement(
         context: Context,

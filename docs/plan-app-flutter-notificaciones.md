@@ -404,6 +404,20 @@ Requiere D4 resuelto (`google-services.json`, SHA-1 si aplica Google
 Sign-In). Sin esto, ninguna fase posterior que toque Firebase puede
 avanzar.
 
+## Fase 8.5 — ✅ Implementada: wrapper de la PWA (WebView con sesión compartida)
+
+Añadida 2026-09-14, después de la Fase 13 (por prioridad explícita del
+usuario, ver commits `2820528`/`87d39f1`/`b2b807d`/`10cf50f`). La app
+Android tiene una pestaña "App" (`HomeShell`, primera/default) que carga
+la PWA completa en un WebView, con sesión de Firebase Auth compartida
+automáticamente con el login nativo (Fase 8) — sin pedir credenciales de
+nuevo. Puente en `src/lib/firebase.js`
+(`window.__mcfNativeSignIn`/`window.__mcfAuthUid`) + lógica nativa en
+`mobile/lib/features/webview/pwa_webview_page.dart`. Detalle: Google
+bloquea su propio `signInWithPopup` dentro de WebViews embebidos, así que
+la única vía viable es reproducir el idToken de Google ya obtenido
+nativamente — no un login nuevo dentro del WebView.
+
 ## Fase 9 — Confirmación/edición en el teléfono — resuelve D5
 
 Pantalla de revisión antes de guardar: tipo, monto, comercio/nota, cuenta

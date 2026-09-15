@@ -59,13 +59,20 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
     ''');
   }
 
-  // `window.__mcfAuthUid` (ver src/lib/firebase.js) empieza en 'pending'
-  // hasta que Firebase resuelve el estado real de sesión — se espera a que
-  // deje de ser 'pending' (con un límite corto) antes de decidir.
+  // `window.__mcfAuthUid` (ver src/lib/firebase.js) empieza en 'pending' y
+  // termina en 'signed-out' o un uid real una vez que Firebase resuelve el
+  // estado de sesión. Antes de que el script siquiera corra, la variable
+  // es `undefined` — que al leerla desde nativo también aparece como texto
+  // "null", igual que si de verdad fuera `null` — por eso NO se trata
+  // "null"/`pending` como señal de "sin sesión": solo el string explícito
+  // 'signed-out' lo es. Cualquier otra cosa sigue reintentando (con un
+  // límite generoso: rehidratar la sesión persistida dentro de un WebView
+  // puede tardar más que en un navegador normal).
   Future<bool> _alreadySignedInOnWeb() async {
-    for (var attempt = 0; attempt < 10; attempt++) {
+    for (var attempt = 0; attempt < 25; attempt++) {
       final value = await _readJsString('window.__mcfAuthUid');
-      if (value != 'pending') return value != null;
+      if (value == 'signed-out') return false;
+      if (value != null && value != 'pending' && value != 'null') return true;
       await Future.delayed(const Duration(milliseconds: 300));
     }
     return false;
@@ -77,7 +84,7 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
     if (text.startsWith('"') && text.endsWith('"')) {
       text = jsonDecode(text) as String;
     }
-    return text == 'null' ? null : text;
+    return text;
   }
 
   // Silencioso, sin UI — el usuario ya dio consentimiento nativamente

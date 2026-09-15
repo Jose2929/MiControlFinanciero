@@ -35,9 +35,12 @@ if (typeof window !== 'undefined') {
   // intentar __mcfNativeSignIn — evita pedir un idToken nativo (que en
   // dispositivos con varias cuentas de Google guardadas puede mostrar un
   // selector interactivo) cuando no hace falta. 'pending' hasta que
-  // Firebase resuelve el estado inicial real.
+  // Firebase resuelve el estado inicial real; 'signed-out' (no `null`)
+  // para que el lado nativo pueda distinguirlo sin ambigüedad de
+  // "todavía no cargó este script" (ahí `window.__mcfAuthUid` sería
+  // `undefined`, indistinguible de `null` una vez serializado).
   window.__mcfAuthUid = 'pending'
   onAuthStateChanged(auth, (user) => {
-    window.__mcfAuthUid = user ? user.uid : null
+    window.__mcfAuthUid = user ? user.uid : 'signed-out'
   })
 }

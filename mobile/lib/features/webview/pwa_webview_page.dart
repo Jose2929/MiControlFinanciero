@@ -34,6 +34,13 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
   }
 
   Future<void> _injectNativeSignIn() async {
+    // La sesión de Firebase Auth del WebView persiste sola entre aperturas
+    // (igual que en cualquier navegador) — si ya hay sesión, no hace falta
+    // (ni conviene) pedir un idToken nativo: en teléfonos con varias
+    // cuentas de Google guardadas eso puede mostrar un selector
+    // interactivo en vez de resolverse en silencio.
+    if (await _alreadySignedInOnWeb()) return;
+
     final idToken = await _freshGoogleIdToken();
     // Sin Google Sign-In nativo (p. ej. cuenta email/password) la PWA
     // simplemente muestra su propio login dentro del WebView — funciona
@@ -50,6 +57,27 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
         }
       })(15);
     ''');
+  }
+
+  // `window.__mcfAuthUid` (ver src/lib/firebase.js) empieza en 'pending'
+  // hasta que Firebase resuelve el estado real de sesión — se espera a que
+  // deje de ser 'pending' (con un límite corto) antes de decidir.
+  Future<bool> _alreadySignedInOnWeb() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final value = await _readJsString('window.__mcfAuthUid');
+      if (value != 'pending') return value != null;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    return false;
+  }
+
+  Future<String?> _readJsString(String expression) async {
+    final result = await _controller.runJavaScriptReturningResult(expression);
+    var text = result.toString();
+    if (text.startsWith('"') && text.endsWith('"')) {
+      text = jsonDecode(text) as String;
+    }
+    return text == 'null' ? null : text;
   }
 
   // Silencioso, sin UI — el usuario ya dio consentimiento nativamente

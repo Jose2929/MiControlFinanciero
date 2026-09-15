@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, signInWithCredential, GoogleAuthProvider } from 'firebase/auth'
+import { getAuth, onAuthStateChanged, signInWithCredential, GoogleAuthProvider } from 'firebase/auth'
 import { getDatabase } from 'firebase/database'
 
 const firebaseConfig = {
@@ -29,4 +29,15 @@ if (typeof window !== 'undefined') {
   window.__mcfNativeSignIn = (idToken) => {
     signInWithCredential(auth, GoogleAuthProvider.credential(idToken)).catch(() => {})
   }
+
+  // Le permite al wrapper nativo saber si esta sesión del WebView ya está
+  // autenticada (su propia sesión persiste sola entre aperturas) antes de
+  // intentar __mcfNativeSignIn — evita pedir un idToken nativo (que en
+  // dispositivos con varias cuentas de Google guardadas puede mostrar un
+  // selector interactivo) cuando no hace falta. 'pending' hasta que
+  // Firebase resuelve el estado inicial real.
+  window.__mcfAuthUid = 'pending'
+  onAuthStateChanged(auth, (user) => {
+    window.__mcfAuthUid = user ? user.uid : null
+  })
 }

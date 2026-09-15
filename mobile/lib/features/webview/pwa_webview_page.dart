@@ -69,11 +69,11 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
   // límite generoso: rehidratar la sesión persistida dentro de un WebView
   // puede tardar más que en un navegador normal).
   Future<bool> _alreadySignedInOnWeb() async {
-    for (var attempt = 0; attempt < 25; attempt++) {
+    for (var attempt = 0; attempt < 40; attempt++) {
       final value = await _readJsString('window.__mcfAuthUid');
       if (value == 'signed-out') return false;
       if (value != null && value != 'pending' && value != 'null') return true;
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 250));
     }
     return false;
   }

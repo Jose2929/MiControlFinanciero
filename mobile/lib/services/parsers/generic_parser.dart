@@ -16,8 +16,12 @@ import 'transaction_type_detector.dart';
 /// terminar tal cual en Firebase (Apéndice A: nunca notificaciones
 /// completas). El usuario puede escribir su propia nota si quiere.
 class GenericParser implements NotificationParser {
+  // El primer grupo de dígitos usa `+` (no `{1,3}`) para no asumir que un
+  // monto de 4+ cifras siempre trae comas de separador de miles — un
+  // "$1000.00" sin comas solo capturaba "100" con esa restricción,
+  // perdiendo el resto del monto silenciosamente.
   static final RegExp _amountRegex = RegExp(
-    r'\$\s?([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)',
+    r'\$\s?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)',
   );
 
   final TransactionTypeDetector _typeDetector = TransactionTypeDetector();

@@ -57,3 +57,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Fase 15.0(6): recibe mensajes del modulo :wear (Wearable Data Layer).
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+}

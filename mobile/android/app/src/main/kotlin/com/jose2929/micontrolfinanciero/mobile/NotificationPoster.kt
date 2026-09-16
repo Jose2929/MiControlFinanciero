@@ -60,12 +60,33 @@ object NotificationPoster {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Fase 15.1: "Aceptar" registra el movimiento de una vez (primera
+        // cuenta/categoria del hogar, sin abrir ninguna pantalla) via
+        // QuickConfirmReceiver — pensado para tocarse desde la copia
+        // reflejada de esta notificacion en un reloj Wear OS emparejado,
+        // donde no hay forma de abrir la app. getBroadcast (no getActivity):
+        // no debe traer el telefono al frente.
+        val quickConfirmIntent = Intent(context, QuickConfirmReceiver::class.java).apply {
+            putExtra(EXTRA_PACKAGE_NAME, sourcePackageName)
+            putExtra(EXTRA_AMOUNT, amount)
+            putExtra(EXTRA_NOTE, note)
+            putExtra(EXTRA_TIMESTAMP, timestamp)
+            putExtra(EXTRA_TYPE, type)
+        }
+        val quickConfirmPendingIntent = PendingIntent.getBroadcast(
+            context,
+            timestamp.toInt(),
+            quickConfirmIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = Notification.Builder(context, DETECTED_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .addAction(0, "Aceptar", quickConfirmPendingIntent)
             .addAction(0, "Revisar movimiento", pendingIntent)
             .build()
 

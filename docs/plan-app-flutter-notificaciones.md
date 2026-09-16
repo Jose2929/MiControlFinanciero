@@ -466,11 +466,32 @@ Interfaz abstracta `InputSource` (`ManualInputSource`,
 `NotificationInputSource`, futuros `VoiceInputSource`,
 `WearOSInputSource`). No implementar voz todavía.
 
-## Fase 15 — Preparación arquitectónica para Wear OS (sin desarrollar aún)
+## Fase 15 — Wear OS (en construcción)
 
-Solo diseño de interfaces que permitan añadir Wear OS después sin reescribir
-la app. No construir una app Wear OS completa. Aclarar D7 antes de diseñar
-esta fase a fondo.
+Alcance definido con el usuario (2026-09-14): que "Gasto/Ingreso
+detectado" llegue al reloj, poder aceptarlo ahí mismo sin abrir nada (o
+mandarlo al teléfono a editar el detalle), y una tarjeta rápida de voz
+para gastos en efectivo. Arquitectura "reloj delgado, teléfono gordo": el
+reloj no tiene sesión de Firebase propia. Plan de trabajo completo,
+spike de validación y estado detallado en
+`/Users/jose/.claude/plans/generic-sprouting-platypus.md`.
+
+Resumen de avance:
+
+- **15.0 (spike)**: items 1-5 ✅ validados en un Galaxy Watch6 real
+  (headless engine + Firebase, bridging de notificaciones, re-disparo de
+  acciones en el teléfono, módulo `:wear` compilando, reconocimiento de
+  voz en español vía motor de Samsung). Item 6 (`MessageClient` reloj→
+  teléfono) ❌ bloqueado — ver detalle en el plan; probablemente requiere
+  distribución por Play Store, no sideload por ADB.
+- **15.1 (Aceptar rápido / abrir detalle)**: ✅ construida y validada de
+  punta a punta, incluyendo tocar "Aceptar" físicamente desde el reloj
+  con el teléfono cerrado. Ver `QuickConfirmReceiver.kt`,
+  `NotificationPoster.kt` y la rama `_handleQuickConfirm` en
+  `background_dispatcher.dart`.
+- **15.2 (tarjeta de voz)**: pausada por el bloqueador del item 6 del
+  spike — no depende de código nuestro, sino de una limitación de
+  Google Play Services para apps sideload.
 
 ## Fase 16 — ✅ Revisada: seguridad y privacidad (revisión final)
 

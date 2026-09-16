@@ -54,6 +54,7 @@ class NotificationListener : NotificationListenerService() {
         }
 
         val event = mapOf(
+            "kind" to "notification",
             "packageName" to packageName,
             "appName" to appName,
             "title" to title,

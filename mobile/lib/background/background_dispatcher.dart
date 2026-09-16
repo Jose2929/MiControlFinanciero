@@ -8,9 +8,11 @@ import '../models/category.dart';
 import '../models/notification_event.dart';
 import '../models/parsed_transaction.dart';
 import '../models/transaction_type.dart';
+import '../models/account.dart';
 import '../services/household_repository.dart';
 import '../services/notification_deduplicator.dart';
 import '../services/parsers/parser_registry.dart';
+import '../services/parsers/voice_parser.dart';
 import '../services/transaction_writer.dart';
 
 const String backgroundProcessorChannelName = 'mcf/background_processor';
@@ -22,11 +24,13 @@ const _confirmedWriteDedupWindowMs = 24 * 60 * 60 * 1000;
 
 /// Fase 7: entrypoint que Android ejecuta en un `FlutterEngine` headless
 /// (sin Activity/UI), disparado desde `NotificationListener.kt` cada vez
-/// que llega una notificación de una app monitoreada, o desde
+/// que llega una notificación de una app monitoreada, desde
 /// `QuickConfirmReceiver.kt` (Fase 15.1) al tocar "Aceptar" en la
-/// notificación de movimiento detectado — funcione o no la UI de Flutter
-/// en ese momento. El campo `"kind"` del evento (`"notification"` |
-/// `"quick_confirm"`) decide cuál de las dos ramas corre.
+/// notificación de movimiento detectado, o desde
+/// `VoiceMessageListener.kt` (Fase 15.2) con una frase reconocida por voz
+/// en el reloj — funcione o no la UI de Flutter en ese momento. El campo
+/// `"kind"` del evento (`"notification"` | `"quick_confirm"` | `"voice"`)
+/// decide cuál rama corre.
 ///
 /// `vm:entry-point` es obligatorio: sin esto, el compilador Dart en
 /// builds release/profile elimina esta función por tree-shaking al no
@@ -47,6 +51,9 @@ void backgroundNotificationDispatcher() {
       final kind = arguments['kind'] as String? ?? 'notification';
       if (kind == 'quick_confirm') {
         await _handleQuickConfirm(arguments, deduplicator);
+      } else if (kind == 'voice') {
+        final message = await _handleVoice(arguments, deduplicator);
+        await channel.invokeMethod('reportResult', {'message': message});
       } else {
         await _handleNotification(arguments, channel, parserRegistry, deduplicator);
       }
@@ -203,4 +210,97 @@ Future<void> _handleQuickConfirm(
   if (kDebugMode) {
     debugPrint('[Background] quick_confirm: movimiento guardado en $householdId');
   }
+}
+
+/// Fase 15.2: registra un gasto en efectivo dicho por voz desde la Tile
+/// del reloj ("gasté 200 pesos en la categoría compras"). Devuelve un
+/// mensaje corto para mostrar en el reloj (éxito o motivo del error) —
+/// `VoiceMessageListener.kt` lo manda de vuelta por el mismo canal.
+Future<String> _handleVoice(
+  Map<String, dynamic> arguments,
+  NotificationDeduplicator deduplicator,
+) async {
+  final phrase = arguments['phrase'] as String?;
+  if (phrase == null || phrase.trim().isEmpty) {
+    return 'No se reconoció ningún texto.';
+  }
+
+  final parsed = VoiceParser().parse(phrase);
+  if (kDebugMode) {
+    debugPrint('[Background] voice: phrase="$phrase" amount=${parsed?.amount}');
+  }
+  if (parsed == null || !parsed.isRegistrable) {
+    return 'No entendí ese gasto. Intenta de nuevo.';
+  }
+
+  final isDuplicate = await deduplicator.isDuplicate(
+    parsed,
+    scope: 'confirmed_write',
+    windowMs: _confirmedWriteDedupWindowMs,
+  );
+  if (isDuplicate) {
+    return 'Ese gasto ya se había guardado.';
+  }
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  final repository = HouseholdRepository();
+  final householdId = await repository.getHouseholdId();
+  if (householdId == null) {
+    return 'No se encontró tu hogar.';
+  }
+
+  final accounts = await repository.getAccounts(householdId);
+  Account? cashAccount;
+  for (final account in accounts) {
+    if (account.type == AccountType.efectivo) {
+      cashAccount = account;
+      break;
+    }
+  }
+  if (cashAccount == null) {
+    return 'No tienes una cuenta de efectivo configurada.';
+  }
+
+  // El texto de categoría dicho por voz viaja en `parsed.note` (ver
+  // VoiceParser) solo para este matching — nunca se guarda tal cual.
+  final categories = await repository.getCategories(householdId);
+  final spokenCategory = (parsed.note ?? '').toLowerCase();
+  Category? matchedCategory;
+  for (final category in categories) {
+    final label = category.label.toLowerCase();
+    if (spokenCategory.contains(label) || label.contains(spokenCategory)) {
+      matchedCategory = category;
+      break;
+    }
+  }
+  if (matchedCategory == null) {
+    for (final category in categories) {
+      if (category.id == 'otros') {
+        matchedCategory = category;
+        break;
+      }
+    }
+  }
+  matchedCategory ??= categories.isNotEmpty ? categories.first : null;
+  if (matchedCategory == null) {
+    return 'Tu hogar no tiene categorías configuradas.';
+  }
+
+  await TransactionWriter().confirmMovement(
+    householdId: householdId,
+    type: TransactionType.expense,
+    amount: parsed.amount!,
+    note: '',
+    account: cashAccount,
+    category: matchedCategory,
+    date: DateTime.now(),
+  );
+
+  if (kDebugMode) {
+    debugPrint(
+      '[Background] voice: guardado \$${parsed.amount} en ${matchedCategory.label}',
+    );
+  }
+  return 'Guardado: \$${parsed.amount!.toStringAsFixed(0)} en ${matchedCategory.label}';
 }

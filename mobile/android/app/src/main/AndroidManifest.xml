@@ -48,13 +48,13 @@
             android:name=".QuickConfirmReceiver"
             android:exported="false" />
 
-        <!-- Fase 15.0(6): recibe mensajes del modulo :wear por el Wearable
-             Data Layer (spike de transporte, sin logica real todavia).
+        <!-- Fase 15.2: recibe la frase de voz del modulo :wear por el
+             Wearable Data Layer y le contesta por el mismo canal.
              `BIND_LISTENER` es el intent-filter vigente para un
              WearableListenerService declarado en manifiesto (recibe todos
              los eventos; el filtrado por ruta se hace en codigo). -->
         <service
-            android:name=".WearMessageListener"
+            android:name=".VoiceMessageListener"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />

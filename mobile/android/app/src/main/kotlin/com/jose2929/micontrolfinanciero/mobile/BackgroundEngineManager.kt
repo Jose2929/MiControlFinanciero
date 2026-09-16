@@ -20,7 +20,11 @@ object BackgroundEngineManager {
     private const val DEDUP_CHANNEL = "mcf/dedup"
     private const val ENGINE_TIMEOUT_MS = 15_000L
 
-    fun dispatch(context: Context, event: Map<String, Any?>) {
+    fun dispatch(
+        context: Context,
+        event: Map<String, Any?>,
+        onResult: ((String) -> Unit)? = null
+    ) {
         val handle = BackgroundCallbackPrefs.get(context)
         if (handle == null) {
             Log.w(TAG, "No hay callback handle registrado todavia; se ignora el evento")
@@ -81,6 +85,15 @@ object BackgroundEngineManager {
                     NotificationPoster.postDetectedMovement(
                         context, title, text, pkg, amount, note, timestamp, type
                     )
+                    result.success(null)
+                }
+                // Fase 15.2: el entrypoint Dart reporta el resultado de un
+                // movimiento por voz (exito o error, en texto para mostrar
+                // al usuario) antes de "done" -- VoiceMessageListener lo usa
+                // para contestarle al reloj.
+                "reportResult" -> {
+                    val message = call.argument<String>("message") ?: ""
+                    onResult?.invoke(message)
                     result.success(null)
                 }
                 "done" -> {

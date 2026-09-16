@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../notifications/notification_debug_page.dart';
+import '../settings/settings_page.dart';
 
 const _pwaUrl = 'https://jose2929.github.io/MiControlFinanciero/';
 
@@ -110,9 +110,9 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            tooltip: 'Notificaciones',
+            tooltip: 'Ajustes',
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationDebugPage()),
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
             ),
           ),
         ],

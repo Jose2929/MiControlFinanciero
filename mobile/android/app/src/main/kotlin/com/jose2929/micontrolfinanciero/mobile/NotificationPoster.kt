@@ -8,9 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 
-// Fase 7: helper compartido para publicar notificaciones de Android,
-// usado tanto por el boton de prueba (Fase 2) como por el flujo real de
-// "movimiento detectado" que corre desde el engine headless.
+// Fase 7: publica la notificacion de "movimiento detectado" que dispara
+// el engine headless al procesar una notificacion real.
 object NotificationPoster {
     // No privado: NotificationListener lo usa para nunca reprocesar sus
     // propias notificaciones de "movimiento detectado" (evita un bucle

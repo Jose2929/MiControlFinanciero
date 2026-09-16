@@ -206,14 +206,21 @@ dispositivo real, no asumirlo por el nombre comercial.
 ### D7 — "Segundo usuario del hogar" vs "Wear OS futuro"
 
 ¿Son el mismo caso de uso (la pareja del usuario también tendrá Wear OS) o
-independientes? No afecta el MVP, pero sí el diseño de la Fase 14 (voz) y 15
-(Wear OS). Pendiente de aclarar con el usuario, sin bloquear fases anteriores.
+independientes? Dejado de lado deliberadamente (2026-09-15) — no bloquea
+nada de lo construido; si algún día hace falta un diseño multiusuario para
+el reloj, se retoma entonces.
 
-### D8 — Distribución del APK
+### D8 — ✅ Resuelto: sideload, sin Play Store
 
-Sideload manual (compartir el `.apk` directamente) vs Play Console en modo
-"internal testing" (requiere cuenta de desarrollador de Google, US$25 una
-vez). Se decide en la Fase 18, no bloquea nada antes.
+Decidido 2026-09-15: sideload manual (compartir el `.apk` directamente),
+sin publicar en Google Play — la app ya funciona bien así para el uso
+privado de dos usuarios que busca el proyecto, y no vale la pena la cuenta
+de desarrollador de Google (US$25) ni el proceso de "internal testing"
+solo para esto. **Nota corregida**: inicialmente se pensó que esto dejaba
+bloqueada la Fase 15.2 (tarjeta de voz del reloj) porque `MessageClient`
+fallaba en las pruebas — investigado a fondo después, la causa real era
+un `applicationId` distinto entre `:app` y `:wear`, no el sideload (ver
+Fase 15). Sideload y la voz del reloj son independientes.
 
 ---
 
@@ -460,13 +467,16 @@ Mismo modelo/repositorio que el gasto detectado. Campos mínimos: monto,
 categoría real, cuenta real (no "método de pago" libre), nota opcional,
 fecha.
 
-## Fase 14 — Preparación para entrada por voz (sin implementar aún)
+## Fase 14 — ✅ Absorbida por la Fase 15.2
 
 Interfaz abstracta `InputSource` (`ManualInputSource`,
 `NotificationInputSource`, futuros `VoiceInputSource`,
-`WearOSInputSource`). No implementar voz todavía.
+`WearOSInputSource`) — construida como `InputSource<TRaw>` mínima
+(`mobile/lib/services/input_sources/input_source.dart`), implementada por
+`VoiceParser` (Fase 15.2). No se retro-adaptó `NotificationParser` a esta
+interfaz — sin otro consumidor real que lo justifique.
 
-## Fase 15 — Wear OS (en construcción)
+## Fase 15 — ✅ Wear OS: notificaciones, aceptar rápido y voz
 
 Alcance definido con el usuario (2026-09-14): que "Gasto/Ingreso
 detectado" llegue al reloj, poder aceptarlo ahí mismo sin abrir nada (o
@@ -478,20 +488,49 @@ spike de validación y estado detallado en
 
 Resumen de avance:
 
-- **15.0 (spike)**: items 1-5 ✅ validados en un Galaxy Watch6 real
+- **15.0 (spike)**: los 6 items ✅ validados en un Galaxy Watch6 real
   (headless engine + Firebase, bridging de notificaciones, re-disparo de
   acciones en el teléfono, módulo `:wear` compilando, reconocimiento de
-  voz en español vía motor de Samsung). Item 6 (`MessageClient` reloj→
-  teléfono) ❌ bloqueado — ver detalle en el plan; probablemente requiere
-  distribución por Play Store, no sideload por ADB.
+  voz en español vía motor de Samsung, transporte `MessageClient`
+  reloj↔teléfono). El item 6 se dio por bloqueado un primer momento
+  (diagnóstico incorrecto, atribuido a sideload/Play Store) y se resolvió
+  después investigando en internet: la causa real era que `:wear` tenía
+  un `applicationId` distinto al de `:app` — Play Services trata
+  teléfono/reloj como apps ajenas si no coincide, y falla en silencio.
+  Fix de una línea (mismo `applicationId`, namespace de Kotlin puede
+  diferir). Ver el plan de Wear OS para el detalle completo y la lección
+  aprendida.
 - **15.1 (Aceptar rápido / abrir detalle)**: ✅ construida y validada de
   punta a punta, incluyendo tocar "Aceptar" físicamente desde el reloj
   con el teléfono cerrado. Ver `QuickConfirmReceiver.kt`,
   `NotificationPoster.kt` y la rama `_handleQuickConfirm` en
   `background_dispatcher.dart`.
-- **15.2 (tarjeta de voz)**: pausada por el bloqueador del item 6 del
-  spike — no depende de código nuestro, sino de una limitación de
-  Google Play Services para apps sideload.
+- **15.2 (tarjeta de voz)**: ✅ construida y validada de punta a punta en
+  el reloj real — Tile "Gasto por voz" (`VoiceExpenseTileService`,
+  `androidx.wear.protolayout`) → `VoiceExpenseActivity` dispara el picker
+  de voz → manda la frase al teléfono por `MessageClient`
+  (`/mcf/voice_expense`) → `VoiceMessageListener.kt` (`:app`) dispara el
+  motor headless con `"kind": "voice"` → `VoiceParser` (Dart) interpreta
+  la frase, `TransactionWriter` escribe en la cuenta tipo `efectivo` con
+  la categoría que mejor matchea (o "Otros") → el teléfono contesta por
+  el mismo canal (`/mcf/voice_expense_result`) y el reloj muestra el
+  resultado y se cierra solo. Gramática simplificada a pedido del usuario
+  tras la primera prueba real: **"&lt;monto&gt; &lt;categoría&gt;"** (ej.
+  "326 comida"), sin palabras de relleno — soporta monto en dígitos o en
+  palabras ("trescientos veintiséis"). Un bug real encontrado y corregido
+  en el camino: `WearableListenerService.onMessageReceived` corre en un
+  hilo secundario propio, no el principal — crasheaba al crear el
+  `FlutterEngine` headless ahí directo; se resolvió despachando con
+  `Handler(Looper.getMainLooper()).post { ... }`.
+- **Limpieza final (2026-09-15)**: con las tres capacidades ya probadas
+  end-to-end, se quitaron los últimos rastros de herramientas de
+  desarrollo — la pantalla "Notificaciones (debug)" (feed crudo de
+  notificaciones en pantalla) se reemplazó por una pantalla de Ajustes
+  real (estado del permiso, apps monitoreadas, registro manual, cerrar
+  sesión, sin mostrar texto crudo de notificaciones), se quitó la
+  cintilla de debug (`debugShowCheckedModeBanner: false`), y la app del
+  reloj se renombró de "MCF Wear" a "MiControlFinanciero" para
+  consistencia con el teléfono.
 
 ## Fase 16 — ✅ Revisada: seguridad y privacidad (revisión final)
 
@@ -524,19 +563,19 @@ tras cualquier nodo nuevo (p. ej. el de D5).
   verificado con un build release real: cero rastro de esos datos en
   logcat tras disparar el flujo completo.
 
-## Fase 17 — Pruebas
+## Fase 17 — ❌ Descartada: pruebas automatizadas
 
-Parser (gasto válido, abono válido, irrelevante, monto con coma/punto,
-comercio desconocido, notificación duplicada/modificada), apps monitoreadas
-(seleccionada/no seleccionada), Firebase (autenticado/no autenticado,
-pérdida y recuperación de conexión, doble sincronización), PWA (abrir,
-confirmar, cancelar, editar), offline (detectar sin internet, cerrar app,
-reconectar, sincronizar).
+Decidido con el usuario (2026-09-15) no construir una suite de pruebas
+formal — toda la validación del proyecto ha sido manual, en dispositivo
+real, y se seguirá trabajando así. `test/widget_test.dart` se queda como
+la plantilla default de Flutter, sin más.
 
-## Fase 18 — Build de producción / distribución privada
+## Fase 18 — ✅ Resuelta: distribución privada, resuelve D8
 
-APK debug y release firmado. Resolver D8 (sideload vs Play internal
-testing). Sin publicar en Google Play todavía.
+Sideload manual (compartir el `.apk`), sin publicar en Google Play ni
+usar Play Console — ver D8. APK debug firmado con el keystore de debug
+de siempre; no se generó un build release firmado con keystore propio
+porque no hace falta para sideload directo.
 
 ---
 
@@ -577,7 +616,7 @@ testing). Sin publicar en Google Play todavía.
   hasta confirmarse (ver sección D5).
 - [x] D6 — resuelto: Santander, Google Wallet, PayPal, HSBC (`packageName`
   confirmados leyendo el teléfono real, ver sección D6).
-- [ ] D7 — si el "segundo usuario del hogar" y "Wear OS futuro" son el mismo
-  caso de uso.
-- [ ] D8 — sideload vs Play internal testing (se decide en la Fase 18, no
-  bloquea nada antes).
+- [~] D7 — dejado de lado (2026-09-15): si el "segundo usuario del hogar" y
+  "Wear OS futuro" son el mismo caso de uso. No bloquea nada construido.
+- [x] D8 — resuelto: sideload, sin Play Store (ver sección D8) — no
+  bloquea la Fase 15.2 (voz en el reloj), que sí se completó.

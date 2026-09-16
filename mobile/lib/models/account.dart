@@ -18,6 +18,9 @@ class Account {
   final double? balance;
   final double? limit;
   final double? used;
+  // Fase 15.2: disponible para un futuro matching banco↔app de origen
+  // (ver D-bank en el plan de Wear OS) — no se usa todavía para nada.
+  final String? bank;
 
   const Account({
     required this.id,
@@ -27,6 +30,7 @@ class Account {
     this.balance,
     this.limit,
     this.used,
+    this.bank,
   });
 
   factory Account.fromMap(String id, Map<dynamic, dynamic> map) {
@@ -38,6 +42,7 @@ class Account {
       balance: (map['balance'] as num?)?.toDouble(),
       limit: (map['limit'] as num?)?.toDouble(),
       used: (map['used'] as num?)?.toDouble(),
+      bank: map['bank'] as String?,
     );
   }
 

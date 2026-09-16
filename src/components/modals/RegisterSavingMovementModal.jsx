@@ -57,6 +57,13 @@ export function RegisterSavingMovementModal({ account, onClose }) {
       setError('No puedes retirar más de lo que tienes disponible')
       return
     }
+    if (direction === 'deposito' && counterAccountId) {
+      const counterAccount = accounts.find((a) => a.id === counterAccountId)
+      if (counterAccount && value > counterAccount.balance) {
+        setError('La cuenta de origen no tiene suficiente saldo')
+        return
+      }
+    }
     registerSavingMovement({
       accountId: account.id,
       counterAccountId: counterAccountId || null,

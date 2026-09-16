@@ -4,22 +4,19 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { useFinance } from '../../context/FinanceContext'
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { toDateInputValue } from '../../lib/format'
 
 export function ConfirmRecurringPaymentModal({ bill, onClose }) {
   const { accounts, confirmRecurringPayment } = useFinance()
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id)
-  const [date, setDate] = useState(todayISO())
+  const [date, setDate] = useState(toDateInputValue(new Date()))
 
   useEffect(() => {
     if (bill) {
       setAmount(String(bill.estimatedAmount))
       setAccountId(bill.accountId || accounts[0]?.id)
-      setDate(todayISO())
+      setDate(toDateInputValue(new Date()))
     }
   }, [bill]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -27,7 +24,7 @@ export function ConfirmRecurringPaymentModal({ bill, onClose }) {
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!Number(amount)) return
+    if (!amount || Number(amount) <= 0) return
     confirmRecurringPayment(bill.id, { amount: Number(amount), accountId, date })
     onClose()
   }
@@ -49,7 +46,7 @@ export function ConfirmRecurringPaymentModal({ bill, onClose }) {
           ))}
         </Select>
 
-        <Input label="Fecha de cobro" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
+        <Input label="Fecha de cobro" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
 
         <Button type="submit" size="lg" className="w-full">
           Confirmar pago

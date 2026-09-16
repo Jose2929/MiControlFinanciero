@@ -18,6 +18,7 @@ import {
   formatRelativeDue,
   addMonths,
   periodKey,
+  parseDateInputValue,
 } from '../lib/format'
 
 const FinanceContext = createContext(null)
@@ -181,6 +182,24 @@ export function FinanceProvider({ children, store: providedStore }) {
     setDirty(false)
     setRemoteAhead(false)
     setSaveState('idle')
+
+    // Limpia también los datos en memoria del hogar anterior. Sin esto, si el
+    // hogar nuevo todavía no tiene perfil guardado (raw === null más abajo),
+    // la app se queda mostrando —y puede terminar autoguardando— los datos
+    // del hogar anterior bajo la identidad del nuevo (fuga entre hogares).
+    setHydrated(false)
+    remoteApplyRef.current = true
+    setAccounts([])
+    setTransactions([])
+    setDebts([])
+    setBudgets([])
+    setCustomCategories([])
+    setIncomeProfiles([])
+    setRecurringBills([])
+    setRecurringConfirmations([])
+    setDebtConfirmations([])
+    setReadIds(new Set())
+    setBudgetTotalLimitState(null)
 
     const unsubscribe = store.subscribe(
       (raw) => {
@@ -663,7 +682,7 @@ export function FinanceProvider({ children, store: providedStore }) {
         accountId,
         counterAccountId: counterAccountId || null,
         note: note?.trim() || findCategoryLabel(categoryId),
-        date: date ? new Date(date) : new Date(),
+        date: date ? parseDateInputValue(date) : new Date(),
         createdBy: authUser?.uid || null,
       }
       setTransactions((prev) => [tx, ...prev])
@@ -700,7 +719,7 @@ export function FinanceProvider({ children, store: providedStore }) {
           amount: gross - ivaAmount - isrAmount,
           accountId,
           note: note?.trim() || profile.label,
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseDateInputValue(date) : new Date(),
         }
       } else if (profile.mode === 'hourly') {
         const payMode = data.payMode === 'hours' ? 'hours' : 'total'
@@ -717,7 +736,7 @@ export function FinanceProvider({ children, store: providedStore }) {
           amount,
           accountId,
           note: note?.trim() || profile.label,
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseDateInputValue(date) : new Date(),
         }
       } else {
         tx = {
@@ -727,7 +746,7 @@ export function FinanceProvider({ children, store: providedStore }) {
           amount: Number(data.amount),
           accountId,
           note: note?.trim() || profile.label,
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseDateInputValue(date) : new Date(),
         }
       }
       tx.createdBy = authUser?.uid || null
@@ -834,7 +853,7 @@ export function FinanceProvider({ children, store: providedStore }) {
         amount: value,
         direction: isDeposit ? 'deposito' : 'retiro',
         note: note?.trim() || (isDeposit ? 'Depósito a ahorro' : 'Retiro de ahorro'),
-        date: date ? new Date(date) : new Date(),
+        date: date ? parseDateInputValue(date) : new Date(),
         createdBy: authUser?.uid || null,
       }
       setTransactions((prev) => [tx, ...prev])
@@ -863,7 +882,7 @@ export function FinanceProvider({ children, store: providedStore }) {
       accountId,
       amount: signedAmount,
       note: note?.trim() || 'Ajuste de saldo',
-      date: date ? new Date(date) : new Date(),
+      date: date ? parseDateInputValue(date) : new Date(),
       createdBy: authUser?.uid || null,
     }
     setTransactions((prev) => [tx, ...prev])
@@ -892,8 +911,17 @@ export function FinanceProvider({ children, store: providedStore }) {
         if (d.id !== debtId) return d
         const remainingBalance = Math.max(d.remainingBalance - value, 0)
         if (d.kind === 'msi') {
-          const installmentsPaid = Math.min((d.installmentsPaid || 0) + 1, d.installments)
-          const stillOwes = remainingBalance > 0 && installmentsPaid < d.installments
+          // installmentsPaid se calcula a partir de lo realmente pagado (no
+          // +1 fijo por pago) — así un pago parcial o un abono mayor a una
+          // cuota no desincroniza el contador del saldo real. `stillOwes`
+          // depende solo de remainingBalance: antes, si installmentsPaid
+          // llegaba al tope con saldo aún pendiente (pagos parciales), la
+          // fecha de corte/límite dejaba de avanzar para siempre.
+          const installmentsPaid =
+            d.totalAmount > 0
+              ? Math.min(Math.round(((d.totalAmount - remainingBalance) / d.totalAmount) * d.installments), d.installments)
+              : d.installments
+          const stillOwes = remainingBalance > 0
           return {
             ...d,
             remainingBalance,
@@ -943,22 +971,24 @@ export function FinanceProvider({ children, store: providedStore }) {
         if (old.convertedToMsi) return
         const nextAmount = updates.amount != null ? Number(updates.amount) : old.amount
         const nextAccountId = updates.accountId || old.accountId
+        const nextCounterAccountId =
+          updates.counterAccountId !== undefined ? updates.counterAccountId : old.counterAccountId
         const next = {
           ...old,
           ...updates,
           amount: nextAmount,
           accountId: nextAccountId,
-          date: updates.date ? new Date(updates.date) : old.date,
+          date: updates.date ? parseDateInputValue(updates.date) : old.date,
         }
         setTransactions((prev) => prev.map((t) => (t.id === transactionId ? next : t)))
         setAccounts((prev) => {
           const reverted = applyExpenseEffect(prev, old.accountId, old.amount, -1, old.counterAccountId)
-          return applyExpenseEffect(reverted, nextAccountId, nextAmount, 1, old.counterAccountId)
+          return applyExpenseEffect(reverted, nextAccountId, nextAmount, 1, nextCounterAccountId)
         })
       } else if (old.type === 'debt_payment') {
         const nextAmount = updates.amount != null ? Number(updates.amount) : old.amount
         const nextAccountId = updates.accountId || old.accountId
-        const nextDate = updates.date ? new Date(updates.date) : old.date
+        const nextDate = updates.date ? parseDateInputValue(updates.date) : old.date
         const delta = nextAmount - old.amount
         const next = { ...old, ...updates, debtId: old.debtId, amount: nextAmount, accountId: nextAccountId, date: nextDate }
         setTransactions((prev) => prev.map((t) => (t.id === transactionId ? next : t)))
@@ -1005,10 +1035,14 @@ export function FinanceProvider({ children, store: providedStore }) {
             if (d.id !== tx.debtId) return d
             const remainingBalance = Math.min(d.remainingBalance + tx.amount, d.totalAmount)
             if (d.kind === 'msi') {
+              const installmentsPaid =
+                d.totalAmount > 0
+                  ? Math.min(Math.round(((d.totalAmount - remainingBalance) / d.totalAmount) * d.installments), d.installments)
+                  : 0
               return {
                 ...d,
                 remainingBalance,
-                installmentsPaid: Math.max((d.installmentsPaid || 0) - 1, 0),
+                installmentsPaid,
                 dueDate: addMonths(d.dueDate, -1),
                 cutDate: addMonths(d.cutDate, -1),
               }
@@ -1027,7 +1061,7 @@ export function FinanceProvider({ children, store: providedStore }) {
       const value = Number(amount)
       const rate = interestFree ? 0 : Number(monthlyRate) || 0
       const totalAmount = interestFree ? value : Math.round(value * (1 + (rate / 100) * months))
-      const startDate = date ? new Date(date) : new Date()
+      const startDate = date ? parseDateInputValue(date) : new Date()
       const debt = {
         id: nextLocalId('msi'),
         name: note?.trim() || findCategory(categoryId).label,

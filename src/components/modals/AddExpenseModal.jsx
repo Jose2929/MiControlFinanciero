@@ -7,11 +7,7 @@ import { Toggle } from '../ui/Toggle'
 import { useFinance } from '../../context/FinanceContext'
 import { cn } from '../../lib/cn'
 import { categoryColorValue } from '../../lib/categories'
-import { formatMoney } from '../../lib/format'
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { formatMoney, toDateInputValue } from '../../lib/format'
 
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
@@ -22,7 +18,7 @@ export function AddExpenseModal({ open, onClose }) {
   const [subcategoryId, setSubcategoryId] = useState(null)
   const [accountId, setAccountId] = useState(accounts[0]?.id)
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(todayISO())
+  const [date, setDate] = useState(toDateInputValue(new Date()))
   const [error, setError] = useState('')
 
   const [paysCard, setPaysCard] = useState(false)
@@ -47,7 +43,7 @@ export function AddExpenseModal({ open, onClose }) {
     setSubcategoryId(null)
     setAccountId(accounts[0]?.id)
     setNote('')
-    setDate(todayISO())
+    setDate(toDateInputValue(new Date()))
     setError('')
     setDeferred(false)
     setMonths(3)
@@ -228,7 +224,7 @@ export function AddExpenseModal({ open, onClose }) {
         </Select>
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Fecha" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
           <Input label="Nota (opcional)" placeholder="Ej. Cena con amigos" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 

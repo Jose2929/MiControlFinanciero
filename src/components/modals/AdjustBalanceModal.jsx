@@ -15,6 +15,7 @@ export function AdjustBalanceModal({ open, onClose }) {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  const [accountError, setAccountError] = useState('')
 
   function reset() {
     setAccountId(adjustableAccounts[0]?.id || '')
@@ -22,6 +23,7 @@ export function AdjustBalanceModal({ open, onClose }) {
     setAmount('')
     setNote('')
     setError('')
+    setAccountError('')
   }
 
   function handleClose() {
@@ -33,7 +35,7 @@ export function AdjustBalanceModal({ open, onClose }) {
     e.preventDefault()
     const value = Number(amount)
     if (!accountId) {
-      setError('Elige una cuenta')
+      setAccountError('Elige una cuenta')
       return
     }
     if (!value || value <= 0) {
@@ -52,7 +54,14 @@ export function AdjustBalanceModal({ open, onClose }) {
           ingreso ya llegó y en parte ya se gastó, sin tener que registrar cada transacción pasada.
         </p>
 
-        <Select label="Cuenta" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+        <Select
+          label="Cuenta"
+          value={accountId}
+          onChange={(e) => {
+            setAccountId(e.target.value)
+            if (accountError) setAccountError('')
+          }}
+        >
           {adjustableAccounts.length === 0 && <option value="">No tienes cuentas ajustables</option>}
           {adjustableAccounts.map((acc) => (
             <option key={acc.id} value={acc.id}>
@@ -60,6 +69,7 @@ export function AdjustBalanceModal({ open, onClose }) {
             </option>
           ))}
         </Select>
+        {accountError && <p className="-mt-2 text-xs text-negative">{accountError}</p>}
 
         <SegmentedTabs
           className="w-full"

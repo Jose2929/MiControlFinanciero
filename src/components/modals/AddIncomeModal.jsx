@@ -5,18 +5,14 @@ import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { SegmentedTabs } from '../ui/SegmentedTabs'
 import { useFinance } from '../../context/FinanceContext'
-import { formatMoney } from '../../lib/format'
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { formatMoney, toDateInputValue } from '../../lib/format'
 
 export function AddIncomeModal({ open, onClose }) {
   const { accounts, incomeProfiles, findIncomeProfile, addIncome } = useFinance()
   const [sourceId, setSourceId] = useState(incomeProfiles[0]?.id)
   const [accountId, setAccountId] = useState(accounts[0]?.id)
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(todayISO())
+  const [date, setDate] = useState(toDateInputValue(new Date()))
   const [error, setError] = useState('')
 
   const [grossAmount, setGrossAmount] = useState('')
@@ -56,7 +52,7 @@ export function AddIncomeModal({ open, onClose }) {
     setSourceId(incomeProfiles[0]?.id)
     setAccountId(accounts[0]?.id)
     setNote('')
-    setDate(todayISO())
+    setDate(toDateInputValue(new Date()))
     setError('')
   }
 
@@ -229,7 +225,7 @@ export function AddIncomeModal({ open, onClose }) {
         </Select>
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Fecha" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
           <Input label="Nota (opcional)" placeholder="Ej. Quincena" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 

@@ -40,6 +40,30 @@ export function startOfDay(date) {
   return d
 }
 
+// String "YYYY-MM-DD" de un <input type="date"> -> Date a medianoche LOCAL.
+// new Date("YYYY-MM-DD") lo interpreta como medianoche UTC (spec de JS), lo
+// que en cualquier zona horaria detrás de UTC lo corre un día hacia atrás.
+// Este helper es el único punto donde se debe parsear ese string.
+export function parseDateInputValue(value) {
+  if (value instanceof Date) return value
+  const match = typeof value === 'string' && value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return new Date(value)
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day))
+}
+
+// Date -> string "YYYY-MM-DD" en hora LOCAL, listo para un <input type="date">.
+// (d.toISOString().slice(0,10) usa UTC y corre la fecha un día para adelante
+// o atrás según la hora local del usuario — el mismo bug en el otro sentido.)
+export function toDateInputValue(date) {
+  const d = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function daysAgo(n, base = new Date()) {
   const d = startOfDay(base)
   d.setDate(d.getDate() - n)

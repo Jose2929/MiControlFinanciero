@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -18,6 +18,18 @@ export function ConvertToMSIModal({ transaction, onClose }) {
   const [error, setError] = useState('')
 
   const effectiveMonths = customMonths ? Number(customMonths) : months
+
+  // Sin esto, el formulario conservaba los meses/interés/tasa de la última
+  // conversión abierta — al reabrir para OTRA transacción, sus valores
+  // quedaban precargados y se podía convertir con términos equivocados.
+  useEffect(() => {
+    if (!transaction) return
+    setMonths(3)
+    setCustomMonths('')
+    setInterestFree(true)
+    setMonthlyRate('')
+    setError('')
+  }, [transaction])
 
   const preview = useMemo(() => {
     if (!transaction || !effectiveMonths) return null

@@ -17,6 +17,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Fase 16: necesario para que se genere la clase `BuildConfig` (AGP 8+
+    // ya no la genera por defecto) — la usan NotificationListener.kt y
+    // MainActivity.kt para no loguear datos financieros reales en release.
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.jose2929.micontrolfinanciero.mobile"
@@ -49,4 +56,9 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Fase 15.0(6): recibe mensajes del modulo :wear (Wearable Data Layer).
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
 }

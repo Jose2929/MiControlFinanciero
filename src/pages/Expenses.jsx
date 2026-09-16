@@ -11,7 +11,7 @@ import { TransactionRow } from '../components/finance/TransactionRow'
 import { MoneyText } from '../components/finance/MoneyText'
 import { ConvertToMSIModal } from '../components/modals/ConvertToMSIModal'
 import { EditTransactionModal } from '../components/modals/EditTransactionModal'
-import { formatGroupLabel, formatMoney, startOfDay } from '../lib/format'
+import { formatGroupLabel, formatMoney, startOfDay, parseDateInputValue } from '../lib/format'
 import { getSubcategory } from '../lib/categories'
 import { cn } from '../lib/cn'
 
@@ -39,8 +39,8 @@ export default function Expenses() {
 
   const expenses = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const from = dateFrom ? startOfDay(dateFrom).getTime() : null
-    const to = dateTo ? startOfDay(dateTo).getTime() : null
+    const from = dateFrom ? parseDateInputValue(dateFrom).getTime() : null
+    const to = dateTo ? parseDateInputValue(dateTo).getTime() : null
 
     return transactions
       .filter((t) => t.type === 'expense' || t.type === 'debt_payment' || t.type === 'saving_movement')

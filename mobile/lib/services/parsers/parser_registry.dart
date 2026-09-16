@@ -1,6 +1,5 @@
 import '../../models/notification_event.dart';
 import '../../models/parsed_transaction.dart';
-import '../monitored_apps_bridge.dart';
 import 'generic_parser.dart';
 import 'google_wallet_parser.dart';
 import 'hsbc_parser.dart';
@@ -14,9 +13,6 @@ class ParserRegistry {
     'com.google.android.apps.walletnfcrel': GoogleWalletParser(),
     'com.paypal.android.p2pmobile': PayPalParser(),
     'mx.hsbc.hsbcmexico': HsbcParser(),
-    // Solo para pruebas: reutiliza el parser generico sobre la
-    // notificacion de prueba que genera esta misma app.
-    MonitoredAppsBridge.selfTestPackage: GenericParser(),
   };
 
   static final NotificationParser _fallback = GenericParser();

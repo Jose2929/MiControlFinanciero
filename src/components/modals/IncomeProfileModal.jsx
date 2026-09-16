@@ -55,10 +55,13 @@ export function IncomeProfileModal({ mode, onClose }) {
       label: label.trim(),
       mode: profileMode,
       payFrequency,
-      defaultIvaPercent,
-      defaultIsrPercent,
-      defaultHourlyRate,
-      defaultAmount,
+      // Coercionar aquí (no solo en el alta) — updateIncomeProfile hace un
+      // merge directo sin convertir tipos, así que editar sin tocar nada
+      // guardaba estos campos como string en vez de number.
+      defaultIvaPercent: Number(defaultIvaPercent) || 0,
+      defaultIsrPercent: Number(defaultIsrPercent) || 0,
+      defaultHourlyRate: Number(defaultHourlyRate) || 0,
+      defaultAmount: Number(defaultAmount) || 0,
     }
     if (isEdit) {
       updateIncomeProfile(mode.profile.id, data)

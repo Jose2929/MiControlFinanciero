@@ -6,12 +6,7 @@ import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { AddCategoryForm } from '../finance/AddCategoryForm'
 import { useFinance } from '../../context/FinanceContext'
-
-function toDateInput(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
-}
+import { parseDateInputValue, toDateInputValue } from '../../lib/format'
 
 // Solo edición — no se piden altas nuevas de deuda desde aquí.
 export function DebtModal({ debt, onClose }) {
@@ -41,8 +36,8 @@ export function DebtModal({ debt, onClose }) {
     setRemainingBalance(String(debt.remainingBalance ?? ''))
     setInterestRate(String(debt.interestRate ?? ''))
     setMinPayment(String(debt.minPayment ?? ''))
-    setCutDate(toDateInput(debt.cutDate))
-    setDueDate(toDateInput(debt.dueDate))
+    setCutDate(toDateInputValue(debt.cutDate))
+    setDueDate(toDateInputValue(debt.dueDate))
     setInstallments(String(debt.installments ?? ''))
     setInstallmentsPaid(String(debt.installmentsPaid ?? ''))
   }, [debt])
@@ -52,16 +47,22 @@ export function DebtModal({ debt, onClose }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) return
+    // Un campo vacío conserva el valor anterior (en vez de guardarse como 0)
+    // — antes, limpiar por error "Saldo restante" marcaba la deuda como
+    // pagada. Un "0" explícito sí se respeta (p.ej. tasa de interés en 0%).
+    const nextTotalAmount = totalAmount === '' ? debt.totalAmount : Number(totalAmount) || 0
+    const nextRemainingBalance = remainingBalance === '' ? debt.remainingBalance : Number(remainingBalance) || 0
     updateDebt(debt.id, {
       name: name.trim(),
       type: type.trim(),
       categoryId: categoryId || null,
-      totalAmount: Number(totalAmount) || 0,
-      remainingBalance: Number(remainingBalance) || 0,
-      interestRate: Number(interestRate) || 0,
-      minPayment: Number(minPayment) || 0,
-      cutDate: cutDate ? new Date(cutDate) : debt.cutDate,
-      dueDate: dueDate ? new Date(dueDate) : debt.dueDate,
+      totalAmount: nextTotalAmount,
+      // El saldo restante nunca puede superar el monto total.
+      remainingBalance: Math.min(nextRemainingBalance, nextTotalAmount),
+      interestRate: interestRate === '' ? debt.interestRate : Number(interestRate) || 0,
+      minPayment: minPayment === '' ? debt.minPayment : Number(minPayment) || 0,
+      cutDate: cutDate ? parseDateInputValue(cutDate) : debt.cutDate,
+      dueDate: dueDate ? parseDateInputValue(dueDate) : debt.dueDate,
       ...(isMsi && {
         installments: Number(installments) || debt.installments,
         installmentsPaid: Number(installmentsPaid) || 0,

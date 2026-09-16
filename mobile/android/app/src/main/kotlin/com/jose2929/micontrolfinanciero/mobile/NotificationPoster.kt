@@ -8,11 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 
-// Fase 7: helper compartido para publicar notificaciones de Android,
-// usado tanto por el boton de prueba (Fase 2) como por el flujo real de
-// "movimiento detectado" que corre desde el engine headless.
+// Fase 7: publica la notificacion de "movimiento detectado" que dispara
+// el engine headless al procesar una notificacion real.
 object NotificationPoster {
-    private const val TEST_CHANNEL_ID = "mcf_test_channel"
     // No privado: NotificationListener lo usa para nunca reprocesar sus
     // propias notificaciones de "movimiento detectado" (evita un bucle
     // infinito de auto-retroalimentacion).
@@ -28,22 +26,6 @@ object NotificationPoster {
     const val EXTRA_TIMESTAMP = "mcf_timestamp"
     const val EXTRA_TYPE = "mcf_type"
     const val ACTION_CONFIRM_MOVEMENT = "confirm_movement"
-
-    fun postTest(context: Context) {
-        ensureChannel(context, TEST_CHANNEL_ID, "Pruebas MiControlFinanciero")
-
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val notification = Notification.Builder(context, TEST_CHANNEL_ID)
-            .setContentTitle("Cargo de prueba")
-            .setContentText("Compra por \$250.00 en Tienda de Prueba")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setAutoCancel(true)
-            .build()
-
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
-    }
 
     fun postDetectedMovement(
         context: Context,
@@ -77,12 +59,33 @@ object NotificationPoster {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Fase 15.1: "Aceptar" registra el movimiento de una vez (primera
+        // cuenta/categoria del hogar, sin abrir ninguna pantalla) via
+        // QuickConfirmReceiver — pensado para tocarse desde la copia
+        // reflejada de esta notificacion en un reloj Wear OS emparejado,
+        // donde no hay forma de abrir la app. getBroadcast (no getActivity):
+        // no debe traer el telefono al frente.
+        val quickConfirmIntent = Intent(context, QuickConfirmReceiver::class.java).apply {
+            putExtra(EXTRA_PACKAGE_NAME, sourcePackageName)
+            putExtra(EXTRA_AMOUNT, amount)
+            putExtra(EXTRA_NOTE, note)
+            putExtra(EXTRA_TIMESTAMP, timestamp)
+            putExtra(EXTRA_TYPE, type)
+        }
+        val quickConfirmPendingIntent = PendingIntent.getBroadcast(
+            context,
+            timestamp.toInt(),
+            quickConfirmIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = Notification.Builder(context, DETECTED_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .addAction(0, "Aceptar", quickConfirmPendingIntent)
             .addAction(0, "Revisar movimiento", pendingIntent)
             .build()
 

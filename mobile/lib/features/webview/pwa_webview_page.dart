@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../settings/settings_page.dart';
+
 const _pwaUrl = 'https://jose2929.github.io/MiControlFinanciero/';
 
 /// Fase 8.5: "wrapper" nativo de la PWA completa. Comparte sesión con el
@@ -103,7 +105,18 @@ class _PwaWebViewPageState extends State<PwaWebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('MiControlFinanciero')),
+      appBar: AppBar(
+        title: const Text('MiControlFinanciero'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Ajustes',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            ),
+          ),
+        ],
+      ),
       body: WebViewWidget(controller: _controller),
     );
   }

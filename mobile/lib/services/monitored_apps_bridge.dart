@@ -5,9 +5,6 @@ import '../models/monitored_app.dart';
 class MonitoredAppsBridge {
   static const _methodChannel = MethodChannel('mcf/monitored_apps');
 
-  static const String selfTestPackage =
-      'com.jose2929.micontrolfinanciero.mobile';
-
   List<MonitoredApp> _decode(List<dynamic>? raw) {
     return (raw ?? [])
         .map((r) => r as Map)
@@ -16,7 +13,6 @@ class MonitoredAppsBridge {
             packageName: r['packageName'] as String,
             displayName: r['displayName'] as String,
             enabled: r['enabled'] as bool? ?? false,
-            isDevTool: r['isDevTool'] as bool? ?? false,
           ),
         )
         .toList();

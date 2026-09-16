@@ -8,8 +8,7 @@ import org.json.JSONObject
 data class MonitoredAppEntry(
     val packageName: String,
     val displayName: String,
-    val enabled: Boolean,
-    val isDevTool: Boolean
+    val enabled: Boolean
 )
 
 // Fase 3: lista de apps monitoreadas, editable por el usuario (agregar
@@ -30,12 +29,6 @@ object MonitoredAppsPrefs {
         "mx.hsbc.hsbcmexico"
     )
 
-    // Paquete de la propia app, usado por el boton "Enviar notificacion de
-    // prueba". No se puede quitar desde la UI (solo activar/desactivar) para
-    // no perder esa herramienta de desarrollo.
-    const val SELF_TEST_PACKAGE = "com.jose2929.micontrolfinanciero.mobile"
-    private const val SELF_TEST_DISPLAY_NAME = "Notificación de prueba (esta app)"
-
     fun getEnabledPackages(context: Context): Set<String> {
         return getAll(context).filter { it.enabled }.map { it.packageName }.toSet()
     }
@@ -55,8 +48,7 @@ object MonitoredAppsPrefs {
                 MonitoredAppEntry(
                     packageName = packageName,
                     displayName = displayName,
-                    enabled = true,
-                    isDevTool = packageName == SELF_TEST_PACKAGE
+                    enabled = true
                 )
             )
             save(context, current)
@@ -65,10 +57,6 @@ object MonitoredAppsPrefs {
     }
 
     fun removeApp(context: Context, packageName: String): List<MonitoredAppEntry> {
-        if (packageName == SELF_TEST_PACKAGE) {
-            // No se permite quitar la herramienta de prueba, solo desactivarla.
-            return getAll(context)
-        }
         val current = getAll(context).filter { it.packageName != packageName }
         save(context, current)
         return current
@@ -95,12 +83,11 @@ object MonitoredAppsPrefs {
             .map { it.activityInfo.packageName }
             .distinct()
             .filter { it != context.packageName && it !in alreadyMonitored }
-            .map { pkg -> MonitoredAppEntry(pkg, resolveDisplayName(context, pkg), false, false) }
+            .map { pkg -> MonitoredAppEntry(pkg, resolveDisplayName(context, pkg), false) }
             .sortedBy { it.displayName.lowercase() }
     }
 
     private fun resolveDisplayName(context: Context, packageName: String): String {
-        if (packageName == SELF_TEST_PACKAGE) return SELF_TEST_DISPLAY_NAME
         return try {
             val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
             context.packageManager.getApplicationLabel(appInfo).toString()
@@ -110,12 +97,11 @@ object MonitoredAppsPrefs {
     }
 
     private fun seedDefaults(context: Context): List<MonitoredAppEntry> {
-        val seeded = (DEFAULT_SEED_PACKAGES + SELF_TEST_PACKAGE).map { pkg ->
+        val seeded = DEFAULT_SEED_PACKAGES.map { pkg ->
             MonitoredAppEntry(
                 packageName = pkg,
                 displayName = resolveDisplayName(context, pkg),
-                enabled = true,
-                isDevTool = pkg == SELF_TEST_PACKAGE
+                enabled = true
             )
         }
         save(context, seeded)
@@ -134,7 +120,6 @@ object MonitoredAppsPrefs {
             obj.put("packageName", app.packageName)
             obj.put("displayName", app.displayName)
             obj.put("enabled", app.enabled)
-            obj.put("isDevTool", app.isDevTool)
             array.put(obj)
         }
         return array.toString()
@@ -149,8 +134,7 @@ object MonitoredAppsPrefs {
                 MonitoredAppEntry(
                     packageName = obj.getString("packageName"),
                     displayName = obj.getString("displayName"),
-                    enabled = obj.getBoolean("enabled"),
-                    isDevTool = obj.getBoolean("isDevTool")
+                    enabled = obj.getBoolean("enabled")
                 )
             )
         }

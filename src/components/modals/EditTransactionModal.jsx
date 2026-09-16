@@ -4,12 +4,7 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { useFinance } from '../../context/FinanceContext'
-
-function toDateInput(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
-}
+import { toDateInputValue } from '../../lib/format'
 
 // Edita o elimina una transacción ya registrada — gasto normal o pago de
 // deuda. Las transacciones convertidas a MSI no pasan por aquí (no se
@@ -24,6 +19,7 @@ export function EditTransactionModal({ transaction, onClose }) {
   const [accountId, setAccountId] = useState('')
   const [note, setNote] = useState('')
   const [date, setDate] = useState('')
+  const [error, setError] = useState('')
 
   const category = allCategories.find((c) => c.id === categoryId)
 
@@ -34,7 +30,8 @@ export function EditTransactionModal({ transaction, onClose }) {
     setSubcategoryId(transaction.subcategoryId || '')
     setAccountId(transaction.accountId || accounts[0]?.id || '')
     setNote(transaction.note || '')
-    setDate(toDateInput(transaction.date))
+    setDate(toDateInputValue(transaction.date))
+    setError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transaction])
 
@@ -43,7 +40,10 @@ export function EditTransactionModal({ transaction, onClose }) {
   function handleSubmit(e) {
     e.preventDefault()
     const value = Number(amount)
-    if (!value || value <= 0) return
+    if (!value || value <= 0) {
+      setError('Ingresa un monto válido')
+      return
+    }
     updateTransaction(transaction.id, {
       amount: value,
       categoryId: categoryId || null,
@@ -72,7 +72,11 @@ export function EditTransactionModal({ transaction, onClose }) {
           type="number"
           min="0"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => {
+            setAmount(e.target.value)
+            if (error) setError('')
+          }}
+          error={error}
           required
         />
 
@@ -111,7 +115,7 @@ export function EditTransactionModal({ transaction, onClose }) {
         </Select>
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Fecha" type="date" value={date} max={toDateInput(new Date())} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
           <Input label="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 

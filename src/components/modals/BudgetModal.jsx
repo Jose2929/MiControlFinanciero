@@ -46,7 +46,9 @@ export function BudgetModal({ mode, onClose }) {
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!categoryId || !limit) return
+    // "!limit" no bastaba: el string "0" es verdadero en JS, así que un
+    // límite de $0 pasaba la validación.
+    if (!categoryId || !(Number(limit) > 0)) return
     upsertBudget(categoryId, limit)
     onClose()
   }

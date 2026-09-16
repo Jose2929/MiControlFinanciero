@@ -24,6 +24,10 @@ plugins {
     id("com.google.gms.google-services") version("4.3.15") apply false
     // END: FlutterFire Configuration
     id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // Fase 15.0(4): requerido por :wear para compilar Compose (Kotlin 2.0+
+    // separo el compilador de Compose del plugin de Kotlin).
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0" apply false
 }
 
 include(":app")
+include(":wear")

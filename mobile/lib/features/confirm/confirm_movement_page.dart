@@ -10,7 +10,7 @@ import '../../models/transaction_type.dart';
 import '../../services/household_repository.dart';
 import '../../services/notification_deduplicator.dart';
 import '../../services/transaction_writer.dart';
-import '../home/home_shell.dart';
+import '../webview/pwa_webview_page.dart';
 
 // Fase 12: chequeo de dedup justo antes de escribir usa una ventana mucho
 // más larga que el default de 60s (Fase 6/7) porque una escritura puede
@@ -121,17 +121,19 @@ class _ConfirmMovementPageState extends State<ConfirmMovementPage> {
 
   // Si hay una ruta debajo (llegamos aquí con push, no como ruta inicial),
   // basta con volver a ella en vez de reemplazar — evita dejar una
-  // "Notificaciones (debug)" duplicada en el stack (warm start de la Fase
-  // 9/12, o el registro manual de la Fase 13). Solo cuando esta pantalla
-  // es la ruta inicial (cold start de una notificación) hace falta
-  // reemplazar, porque no hay nada debajo a lo que volver.
-  void _goToDebugPage() {
+  // pantalla duplicada en el stack (warm start de la Fase 9/12, o el
+  // registro manual de la Fase 13). Solo cuando esta pantalla es la ruta
+  // inicial (cold start de una notificación) hace falta reemplazar, porque
+  // no hay nada debajo a lo que volver — en ese caso vamos a la PWA (la
+  // pantalla principal tras iniciar sesión, ver `auth_gate.dart`), no a
+  // Notificaciones, que ahora es una pantalla secundaria.
+  void _goHome() {
     final navigator = Navigator.of(context);
     if (navigator.canPop()) {
       navigator.pop();
     } else {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 1)),
+        MaterialPageRoute(builder: (_) => const PwaWebViewPage()),
       );
     }
   }
@@ -228,7 +230,7 @@ class _ConfirmMovementPageState extends State<ConfirmMovementPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Movimiento guardado.')),
         );
-        _goToDebugPage();
+        _goHome();
       case _SaveOutcome.queuedOffline:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -237,7 +239,7 @@ class _ConfirmMovementPageState extends State<ConfirmMovementPage> {
             ),
           ),
         );
-        _goToDebugPage();
+        _goHome();
       case _SaveOutcome.failed:
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -279,7 +281,7 @@ class _ConfirmMovementPageState extends State<ConfirmMovementPage> {
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
-                      onPressed: _goToDebugPage,
+                      onPressed: _goHome,
                       child: const Text('Cancelar'),
                     ),
                   ],
@@ -402,7 +404,7 @@ class _ConfirmMovementPageState extends State<ConfirmMovementPage> {
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(
-                    onPressed: _saving ? null : _goToDebugPage,
+                    onPressed: _saving ? null : _goHome,
                     child: const Text('Descartar'),
                   ),
                 ],

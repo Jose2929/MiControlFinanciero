@@ -55,7 +55,11 @@ class MainActivity : FlutterActivity() {
             "timestamp" to intent.getLongExtra(NotificationPoster.EXTRA_TIMESTAMP, 0L),
             "type" to intent.getStringExtra(NotificationPoster.EXTRA_TYPE)
         )
-        Log.d("MCF_MainActivity", "Movimiento a confirmar: $extras (isNewIntent=$isNewIntent)")
+        // Fase 16: $extras incluye monto/nota reales — no debe quedar en
+        // logcat de un build de release.
+        if (BuildConfig.DEBUG) {
+            Log.d("MCF_MainActivity", "Movimiento a confirmar: $extras (isNewIntent=$isNewIntent)")
+        }
         if (isNewIntent) {
             confirmMovementMethodChannel?.invokeMethod("showConfirmMovement", extras)
         } else {
@@ -99,10 +103,6 @@ class MainActivity : FlutterActivity() {
                     }
                     "isNotificationAccessGranted" -> {
                         result.success(isNotificationAccessGranted())
-                    }
-                    "postTestNotification" -> {
-                        NotificationPoster.postTest(this)
-                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -203,8 +203,7 @@ class MainActivity : FlutterActivity() {
     private fun MonitoredAppEntry.toMap(): Map<String, Any> = mapOf(
         "packageName" to packageName,
         "displayName" to displayName,
-        "enabled" to enabled,
-        "isDevTool" to isDevTool
+        "enabled" to enabled
     )
 
     private fun isNotificationAccessGranted(): Boolean {

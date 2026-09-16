@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="mobile"
+        android:label="MiControlFinanciero"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -39,6 +39,25 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Fase 15.1: recibe el toque de "Aceptar" en la notificacion de
+             movimiento detectado (telefono o reloj emparejado). -->
+        <receiver
+            android:name=".QuickConfirmReceiver"
+            android:exported="false" />
+
+        <!-- Fase 15.2: recibe la frase de voz del modulo :wear por el
+             Wearable Data Layer y le contesta por el mismo canal.
+             `BIND_LISTENER` es el intent-filter vigente para un
+             WearableListenerService declarado en manifiesto (recibe todos
+             los eventos; el filtrado por ruta se hace en codigo). -->
+        <service
+            android:name=".VoiceMessageListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER" />
             </intent-filter>
         </service>
     </application>

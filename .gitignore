@@ -37,6 +37,10 @@ ui-debug.log*
 # Datos financieros reales usados para pruebas de importación — nunca a git
 import.json
 
+# Tabla real del presupuesto (ingresos, montos, ahorros) — nunca a git. Se
+# importa desde la pantalla Plan; las pruebas versionadas usan cifras ficticias.
+budget-seed.json
+
 # Tests / coverage (Playwright u otros, si se corren dentro del repo)
 coverage
 test-results

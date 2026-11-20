@@ -16,6 +16,7 @@ import Budgets from './pages/Budgets'
 import Notifications from './pages/Notifications'
 import Profile from './pages/Profile'
 import BudgetEnvelopes from './pages/BudgetEnvelopes'
+import BudgetOverview from './pages/BudgetOverview'
 import BudgetCalendar from './pages/BudgetCalendar'
 import BudgetPlan from './pages/BudgetPlan'
 
@@ -82,7 +83,8 @@ function AppRoutes() {
         <Route path="/perfil" element={<Profile />} />
         {/* Apartado Presupuesto: misma sesión, mismo FinanceProvider y mismo
             botón de guardado que el resto de la app. */}
-        <Route path="/presupuesto" element={<BudgetEnvelopes />} />
+        <Route path="/presupuesto" element={<BudgetOverview />} />
+        <Route path="/presupuesto/sobres" element={<BudgetEnvelopes />} />
         <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
         <Route path="/presupuesto/plan" element={<BudgetPlan />} />
       </Route>

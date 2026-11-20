@@ -54,7 +54,7 @@ describe('getAppMode', () => {
 
 describe('rutas y títulos', () => {
   it('cada pestaña de Presupuesto vive bajo /presupuesto y tiene título propio', () => {
-    expect(BUDGET_NAV_ITEMS).toHaveLength(3)
+    expect(BUDGET_NAV_ITEMS).toHaveLength(4)
     for (const item of BUDGET_NAV_ITEMS) {
       expect(getAppMode(item.to)).toBe('presupuesto')
       expect(getPageTitle(item.to)).not.toBe('Mi Control Financiero')
@@ -78,15 +78,15 @@ describe('BottomNav', () => {
     for (const label of ['Inicio', 'Gastos', 'Presupuestos', 'Deudas', 'Perfil']) {
       expect(html).toContain(label)
     }
-    for (const label of ['Sobres', 'Calendario']) {
+    for (const label of ['Resumen', 'Sobres', 'Calendario']) {
       expect(html).not.toContain(label)
     }
     expect(activeHrefs(html)).toEqual(['/gastos'])
   })
 
-  it('en Presupuesto muestra sus 3 pestañas y ninguna de Registro', () => {
+  it('en Presupuesto muestra sus 4 pestañas y ninguna de Registro', () => {
     const html = render(<BottomNav />, '/presupuesto/plan')
-    for (const label of ['Sobres', 'Calendario', 'Plan']) {
+    for (const label of ['Resumen', 'Sobres', 'Calendario', 'Plan']) {
       expect(html).toContain(label)
     }
     expect(html).not.toContain('Quincena')
@@ -95,10 +95,17 @@ describe('BottomNav', () => {
     expect(activeHrefs(html)).toEqual(['/presupuesto/plan'])
   })
 
-  it('"Sobres" solo se marca en /presupuesto exacto, no en sus subpantallas', () => {
+  it('"Resumen" solo se marca en /presupuesto exacto, no en sus subpantallas', () => {
     expect(isActive(render(<BottomNav />, '/presupuesto'), '/presupuesto')).toBe(true)
+    expect(isActive(render(<BottomNav />, '/presupuesto/sobres'), '/presupuesto')).toBe(false)
+    expect(isActive(render(<BottomNav />, '/presupuesto/sobres'), '/presupuesto/sobres')).toBe(true)
     expect(isActive(render(<BottomNav />, '/presupuesto/calendario'), '/presupuesto')).toBe(false)
     expect(isActive(render(<BottomNav />, '/presupuesto/calendario'), '/presupuesto/calendario')).toBe(true)
+  })
+
+  it('cada pantalla de Presupuesto tiene su propio título', () => {
+    expect(getPageTitle('/presupuesto')).toBe('Resumen')
+    expect(getPageTitle('/presupuesto/sobres')).toBe('Sobres')
   })
 
   it('/presupuestos (el viejo) sigue en Registro con su pestaña activa', () => {

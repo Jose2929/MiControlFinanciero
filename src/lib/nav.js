@@ -9,6 +9,7 @@ import {
   Repeat,
   Bell,
   CalendarDays,
+  PieChart,
   SlidersHorizontal,
 } from 'lucide-react'
 
@@ -64,16 +65,18 @@ export const MORE_MENU_ITEMS = [
 ]
 
 // Navegación del apartado Presupuesto — la usan tanto la barra inferior
-// (celular) como el sidebar (escritorio). `end` evita que "Sobres" quede
-// marcado también en /presupuesto/plan, etc.
+// (celular) como el sidebar (escritorio). `end` evita que "Resumen" (que vive en
+// /presupuesto) quede marcado también en /presupuesto/plan, etc.
 export const BUDGET_NAV_ITEMS = [
-  { to: '/presupuesto', label: 'Sobres', icon: Wallet, end: true },
+  { to: '/presupuesto', label: 'Resumen', icon: PieChart, end: true },
+  { to: '/presupuesto/sobres', label: 'Sobres', icon: Wallet },
   { to: '/presupuesto/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/presupuesto/plan', label: 'Plan', icon: SlidersHorizontal },
 ]
 
 const PAGE_TITLES = {
-  '/presupuesto': 'Sobres',
+  '/presupuesto': 'Resumen',
+  '/presupuesto/sobres': 'Sobres',
   '/presupuesto/calendario': 'Calendario',
   '/presupuesto/plan': 'Plan del presupuesto',
   '/dashboard': 'Dashboard',

@@ -33,6 +33,14 @@ export const MEDIO_LABELS = {
   ahorro: 'Ahorro',
 }
 
+export const MEDIO_DESCRIPTIONS = {
+  tdc: 'Tarjeta de crédito · solo cargos fijos, se paga completa',
+  tdc2: 'Débito con bolsillos · se aparta cada mes',
+  debito: 'Cuenta de gasto diario',
+  efectivo: 'Se retira de la cuenta de débito',
+  ahorro: 'Ahorros programados',
+}
+
 // Cada cuántos meses se paga realmente un bolsillo (para saber cuánto se
 // junta antes de que llegue el cobro).
 export const PAY_FREQUENCY_MONTHS = { mensual: 1, semestral: 6, anual: 12 }
@@ -42,8 +50,8 @@ export const DEFAULT_SETTINGS = {
   // 15 al 14 del siguiente mes.
   cycleStartDay: 1,
   cutDay: 3,
-  // Fecha límite de pago de la TDC (supuesta, por confirmar — configurable).
-  payDueDay: 23,
+  // Fecha límite de pago de la TDC (día del mes) — configurable.
+  payDueDay: 3,
   // Día de sueldo en que se reparte lo de TDC2, débito y efectivo.
   spendTransferDay: 15,
   // En cuántas partes se retira el efectivo del débito.

@@ -1,8 +1,9 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { Wallet2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext'
 import { FinanceProvider } from './context/FinanceContext'
+import { BudgetProvider } from './context/BudgetContext'
 import { AppShell } from './components/layout/AppShell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -46,6 +47,14 @@ function PublicOnly({ children }) {
   return children
 }
 
+function BudgetLayout() {
+  return (
+    <BudgetProvider>
+      <Outlet />
+    </BudgetProvider>
+  )
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -76,11 +85,14 @@ function AppRoutes() {
         <Route path="/notificaciones" element={<Notifications />} />
         <Route path="/perfil" element={<Profile />} />
         {/* Apartado Presupuesto: misma sesión, mismo FinanceProvider y mismo
-            botón de guardado que el resto de la app. */}
-        <Route path="/presupuesto" element={<BudgetEnvelopes />} />
-        <Route path="/presupuesto/quincena" element={<BudgetFortnight />} />
-        <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
-        <Route path="/presupuesto/plan" element={<BudgetPlan />} />
+            botón de guardado que el resto de la app. El plan se escucha desde
+            su propio nodo de Firebase, y solo mientras estás en este apartado. */}
+        <Route element={<BudgetLayout />}>
+          <Route path="/presupuesto" element={<BudgetEnvelopes />} />
+          <Route path="/presupuesto/quincena" element={<BudgetFortnight />} />
+          <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
+          <Route path="/presupuesto/plan" element={<BudgetPlan />} />
+        </Route>
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

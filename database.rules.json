@@ -37,6 +37,10 @@
         "profile": {
           ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
           ".write": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()"
+        },
+        "budget": {
+          ".read": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()",
+          ".write": "auth != null && root.child('households/' + $hid + '/members/' + auth.uid).exists()"
         }
       }
     }

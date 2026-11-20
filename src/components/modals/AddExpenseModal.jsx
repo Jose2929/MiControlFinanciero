@@ -1,24 +1,32 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { Toggle } from '../ui/Toggle'
 import { useFinance } from '../../context/FinanceContext'
+import { useBudget } from '../../context/BudgetContext'
+import { envelopeOptions, suggestEnvelope } from '../../lib/budgetEnvelopes'
 import { cn } from '../../lib/cn'
 import { categoryColorValue } from '../../lib/categories'
 import { formatMoney, toDateInputValue } from '../../lib/format'
 
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
-export function AddExpenseModal({ open, onClose }) {
-  const { allCategories, accounts, addExpense, addExpenseDeferred } = useFinance()
+// `notice` es un aviso opcional que se muestra arriba del formulario.
+// `preset` ({ accountId, envelopeId, date, minDate, maxDate }) abre el formulario
+// con la cuenta y el sobre ya elegidos, y la fecha propuesta y su rango
+// permitido (AAAA-MM-DD; para corregir un ciclo cerrado); se lee al montar, así que quien lo use debe montarlo solo
+// mientras está abierto (como hace la pantalla de Sobres).
+export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar gasto', notice }) {
+  const { allCategories, accounts, transactions, addExpense, addExpenseDeferred } = useFinance()
+  const { plan, status: budgetStatus } = useBudget()
   const [amount, setAmount] = useState('')
   const [categoryId, setCategoryId] = useState(allCategories[0]?.id)
   const [subcategoryId, setSubcategoryId] = useState(null)
-  const [accountId, setAccountId] = useState(accounts[0]?.id)
+  const [accountId, setAccountId] = useState(preset?.accountId || accounts[0]?.id)
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(toDateInputValue(new Date()))
+  const [date, setDate] = useState(preset?.date || toDateInputValue(new Date()))
   const [error, setError] = useState('')
 
   const [paysCard, setPaysCard] = useState(false)
@@ -37,7 +45,43 @@ export function AddExpenseModal({ open, onClose }) {
   const category = allCategories.find((c) => c.id === categoryId)
   const effectiveMonths = customMonths ? Number(customMonths) : months
 
+  // -- Sobre del presupuesto ---------------------------------------------
+  // Solo aparece si la cuenta elegida está ligada a un medio del plan. Se
+  // preselecciona una sugerencia (historial o nombre) pero nunca se asigna sola:
+  // la persona la confirma o la cambia. Un pago de tarjeta o un gasto diferido
+  // a MSI no cuenta contra un sobre, así que ahí no se ofrece.
+  const [envelopeId, setEnvelopeId] = useState(preset?.envelopeId || '')
+  const [envelopeTouched, setEnvelopeTouched] = useState(Boolean(preset?.envelopeId))
+  const activeAccountId = accountId || accounts[0]?.id
+  const envelopeChoices = useMemo(
+    () => (budgetStatus === 'ready' ? envelopeOptions(plan, activeAccountId) : []),
+    [budgetStatus, plan, activeAccountId]
+  )
+  const showEnvelope = !deferred && !paysCard && envelopeChoices.length > 0
+  const suggestion = useMemo(
+    () =>
+      showEnvelope
+        ? suggestEnvelope({
+            plan,
+            accountId: activeAccountId,
+            categoryId,
+            categoryLabel: category?.label,
+            transactions,
+          })
+        : null,
+    [showEnvelope, plan, activeAccountId, categoryId, category?.label, transactions]
+  )
+  const suggestedId = suggestion?.lineId || ''
+
+  useEffect(() => {
+    if (!envelopeTouched) setEnvelopeId(suggestedId)
+    // Si cambió de cuenta a otro medio, el sobre elegido ya no aplica.
+    else if (envelopeId && !envelopeChoices.some((line) => line.id === envelopeId)) setEnvelopeId('')
+  }, [suggestedId, envelopeTouched, envelopeChoices, envelopeId])
+
   function reset() {
+    setEnvelopeId('')
+    setEnvelopeTouched(false)
     setAmount('')
     setCategoryId(allCategories[0]?.id)
     setSubcategoryId(null)
@@ -98,6 +142,7 @@ export function AddExpenseModal({ open, onClose }) {
         subcategoryId,
         accountId,
         counterAccountId: paysCard ? counterAccountId : null,
+        envelopeId: showEnvelope ? envelopeId || null : null,
         note,
         date,
       })
@@ -126,8 +171,14 @@ export function AddExpenseModal({ open, onClose }) {
   }, [deferred, amount, effectiveMonths, interestFree, monthlyRate])
 
   return (
-    <Modal open={open} onClose={handleClose} title="Agregar gasto">
+    <Modal open={open} onClose={handleClose} title={title}>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {notice && (
+          <p role="note" className="rounded-xl border border-warning/40 bg-warning-soft p-3 text-xs text-ink">
+            {notice}
+          </p>
+        )}
+
         <div className="flex flex-col items-center gap-1 py-2">
           <span className="text-sm text-muted">Monto</span>
           <div className="flex items-center gap-1">
@@ -223,8 +274,44 @@ export function AddExpenseModal({ open, onClose }) {
           ))}
         </Select>
 
+        {showEnvelope && (
+          <div>
+            <Select
+              label="Sobre del presupuesto (opcional)"
+              value={envelopeId}
+              onChange={(e) => {
+                setEnvelopeId(e.target.value)
+                setEnvelopeTouched(true)
+              }}
+            >
+              <option value="">Sin sobre</option>
+              {envelopeChoices.map((line) => (
+                <option key={line.id} value={line.id}>
+                  {line.name}
+                </option>
+              ))}
+            </Select>
+            {!envelopeTouched && suggestion && (
+              <p className="mt-1 text-xs text-muted">
+                {suggestion.reason === 'rule'
+                  ? 'Sobre ligado a esta categoría.'
+                  : suggestion.reason === 'history'
+                    ? 'Sugerido según tus gastos anteriores en esta categoría.'
+                    : 'Sugerido porque se llama igual que la categoría.'}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
+          <Input
+            label="Fecha"
+            type="date"
+            value={date}
+            min={preset?.minDate}
+            max={preset?.maxDate || toDateInputValue(new Date())}
+            onChange={(e) => setDate(e.target.value)}
+          />
           <Input label="Nota (opcional)" placeholder="Ej. Cena con amigos" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 

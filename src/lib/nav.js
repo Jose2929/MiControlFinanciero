@@ -1,4 +1,37 @@
-import { LayoutDashboard, Receipt, Wallet, HandCoins, PiggyBank, User, TrendingUp, Repeat, Bell } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Receipt,
+  Wallet,
+  HandCoins,
+  PiggyBank,
+  User,
+  TrendingUp,
+  Repeat,
+  Bell,
+  CalendarDays,
+  PieChart,
+  SlidersHorizontal,
+} from 'lucide-react'
+
+// La app tiene dos apartados que comparten login, datos y botón de guardado:
+//   · "registro"    — todo lo que ya existía (gastos, cuentas, deudas…).
+//   · "presupuesto" — el plan por ciclos con sobres (rutas bajo /presupuesto).
+// OJO: /presupuestos (plural) es la pantalla vieja de límites por categoría y
+// pertenece a "registro"; por eso la comparación es exacta, no un startsWith
+// a secas.
+export const APP_MODES = [
+  { id: 'registro', label: 'Registro' },
+  { id: 'presupuesto', label: 'Presupuesto' },
+]
+
+export const MODE_HOME = {
+  registro: '/dashboard',
+  presupuesto: '/presupuesto',
+}
+
+export function getAppMode(pathname = '') {
+  return pathname === '/presupuesto' || pathname.startsWith('/presupuesto/') ? 'presupuesto' : 'registro'
+}
 
 // Full set — used by the desktop sidebar.
 export const NAV_ITEMS = [
@@ -31,7 +64,21 @@ export const MORE_MENU_ITEMS = [
   { to: '/notificaciones', label: 'Notificaciones', icon: Bell },
 ]
 
+// Navegación del apartado Presupuesto — la usan tanto la barra inferior
+// (celular) como el sidebar (escritorio). `end` evita que "Resumen" (que vive en
+// /presupuesto) quede marcado también en /presupuesto/plan, etc.
+export const BUDGET_NAV_ITEMS = [
+  { to: '/presupuesto', label: 'Resumen', icon: PieChart, end: true },
+  { to: '/presupuesto/sobres', label: 'Sobres', icon: Wallet },
+  { to: '/presupuesto/calendario', label: 'Calendario', icon: CalendarDays },
+  { to: '/presupuesto/plan', label: 'Plan', icon: SlidersHorizontal },
+]
+
 const PAGE_TITLES = {
+  '/presupuesto': 'Resumen',
+  '/presupuesto/sobres': 'Sobres',
+  '/presupuesto/calendario': 'Calendario',
+  '/presupuesto/plan': 'Plan del presupuesto',
   '/dashboard': 'Dashboard',
   '/ingresos': 'Ingresos',
   '/gastos': 'Gastos',

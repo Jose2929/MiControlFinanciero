@@ -3,6 +3,7 @@ import { Wallet2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext'
 import { FinanceProvider } from './context/FinanceContext'
+import { BudgetProvider } from './context/BudgetContext'
 import { AppShell } from './components/layout/AppShell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -14,6 +15,10 @@ import Recurring from './pages/Recurring'
 import Budgets from './pages/Budgets'
 import Notifications from './pages/Notifications'
 import Profile from './pages/Profile'
+import BudgetEnvelopes from './pages/BudgetEnvelopes'
+import BudgetOverview from './pages/BudgetOverview'
+import BudgetCalendar from './pages/BudgetCalendar'
+import BudgetPlan from './pages/BudgetPlan'
 
 function SplashScreen() {
   return (
@@ -57,7 +62,12 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <FinanceProvider>
-              <AppShell />
+              {/* El plan del presupuesto se escucha en toda la app (no solo en
+                  /presupuesto) porque el modal de gasto, que vive en Registro,
+                  también ofrece el selector de sobre. */}
+              <BudgetProvider>
+                <AppShell />
+              </BudgetProvider>
             </FinanceProvider>
           </RequireAuth>
         }
@@ -71,6 +81,12 @@ function AppRoutes() {
         <Route path="/presupuestos" element={<Budgets />} />
         <Route path="/notificaciones" element={<Notifications />} />
         <Route path="/perfil" element={<Profile />} />
+        {/* Apartado Presupuesto: misma sesión, mismo FinanceProvider y mismo
+            botón de guardado que el resto de la app. */}
+        <Route path="/presupuesto" element={<BudgetOverview />} />
+        <Route path="/presupuesto/sobres" element={<BudgetEnvelopes />} />
+        <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
+        <Route path="/presupuesto/plan" element={<BudgetPlan />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

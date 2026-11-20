@@ -1,12 +1,14 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Wallet2 } from 'lucide-react'
-import { NAV_ITEMS } from '../../lib/nav'
+import { NAV_ITEMS, BUDGET_NAV_ITEMS, getAppMode } from '../../lib/nav'
 import { useAuth } from '../../context/AuthContext'
 import { Avatar } from '../ui/Avatar'
 import { cn } from '../../lib/cn'
 
 export function Sidebar() {
   const { user } = useAuth()
+  const { pathname } = useLocation()
+  const items = getAppMode(pathname) === 'presupuesto' ? BUDGET_NAV_ITEMS : NAV_ITEMS
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-surface lg:flex">
@@ -21,10 +23,11 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.end}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-150',

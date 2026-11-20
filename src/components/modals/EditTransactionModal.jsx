@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { useFinance } from '../../context/FinanceContext'
+import { useBudget } from '../../context/BudgetContext'
+import { envelopeOptions, getAccountMedio, ruleEnvelopeFor } from '../../lib/budgetEnvelopes'
 import { toDateInputValue } from '../../lib/format'
 
 // Edita o elimina una transacción ya registrada — gasto normal o pago de
@@ -11,17 +13,38 @@ import { toDateInputValue } from '../../lib/format'
 // renderiza el botón que abre este modal para esas filas).
 export function EditTransactionModal({ transaction, onClose }) {
   const { allCategories, accounts, updateTransaction, deleteTransaction } = useFinance()
+  const { plan, status: budgetStatus } = useBudget()
   const isDebtPayment = transaction?.type === 'debt_payment'
 
   const [amount, setAmount] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [envelopeId, setEnvelopeId] = useState('')
   const [note, setNote] = useState('')
   const [date, setDate] = useState('')
   const [error, setError] = useState('')
 
   const category = allCategories.find((c) => c.id === categoryId)
+
+  // Sobre del presupuesto: solo en gastos reales (no pagos de deuda ni de
+  // tarjeta) con una cuenta ligada a un medio. Si el selector no se muestra,
+  // el gasto conserva el sobre que ya tenía.
+  const envelopeChoices = useMemo(
+    () =>
+      budgetStatus === 'ready' && !isDebtPayment && !transaction?.counterAccountId
+        ? envelopeOptions(plan, accountId)
+        : [],
+    [budgetStatus, plan, accountId, isDebtPayment, transaction?.counterAccountId]
+  )
+  const showEnvelope = envelopeChoices.length > 0
+  // Un sobre que no es de este medio (p. ej. al cambiar de cuenta) no aplica.
+  const selectedEnvelope = envelopeChoices.some((line) => line.id === envelopeId) ? envelopeId : ''
+  // Sin sobre elegido a mano, el gasto resta del sobre ligado a su categoría
+  // (si lo hay) — se dice en la primera opción para que no sorprenda.
+  const ruledLine = showEnvelope
+    ? envelopeChoices.find((line) => line.id === ruleEnvelopeFor(plan, getAccountMedio(plan, accountId), categoryId))
+    : null
 
   useEffect(() => {
     if (!transaction) return
@@ -29,6 +52,7 @@ export function EditTransactionModal({ transaction, onClose }) {
     setCategoryId(transaction.categoryId || allCategories[0]?.id || '')
     setSubcategoryId(transaction.subcategoryId || '')
     setAccountId(transaction.accountId || accounts[0]?.id || '')
+    setEnvelopeId(transaction.envelopeId || '')
     setNote(transaction.note || '')
     setDate(toDateInputValue(transaction.date))
     setError('')
@@ -48,6 +72,7 @@ export function EditTransactionModal({ transaction, onClose }) {
       amount: value,
       categoryId: categoryId || null,
       ...(!isDebtPayment && { subcategoryId: subcategoryId || null }),
+      ...(showEnvelope && { envelopeId: selectedEnvelope || null }),
       accountId,
       note: note.trim(),
       date,
@@ -113,6 +138,21 @@ export function EditTransactionModal({ transaction, onClose }) {
             </option>
           ))}
         </Select>
+
+        {showEnvelope && (
+          <Select
+            label="Sobre del presupuesto (opcional)"
+            value={selectedEnvelope}
+            onChange={(e) => setEnvelopeId(e.target.value)}
+          >
+            <option value="">{ruledLine ? `Según la categoría (${ruledLine.name})` : 'Sin sobre'}</option>
+            {envelopeChoices.map((line) => (
+              <option key={line.id} value={line.id}>
+                {line.name}
+              </option>
+            ))}
+          </Select>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />

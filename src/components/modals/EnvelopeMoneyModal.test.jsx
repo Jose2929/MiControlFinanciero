@@ -68,13 +68,22 @@ describe('EnvelopeMoneyModal', () => {
     expect(html).toContain('aria-label="Quitar ajuste"')
   })
 
-  it('en un ciclo futuro avisa con qué fecha se anota; hoy o sin fecha, no dice nada', () => {
-    const future = render({ item, date: '2099-01-01' })
+  it('en un ciclo futuro avisa con qué fecha se anota; en el ciclo en curso no dice nada', () => {
+    const future = render({ item, date: '2099-01-01', phase: 'future' })
     expect(future).toContain('Se anota con fecha del')
     expect(future).toContain('cuando empieza este ciclo')
+    expect(future).toContain('Hoy tiene')
     expect(render({ item })).not.toContain('Se anota con fecha')
     const today = new Date()
     const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    expect(render({ item, date: todayValue })).not.toContain('Se anota con fecha')
+    expect(render({ item, date: todayValue, phase: 'current' })).not.toContain('Se anota con fecha')
+  })
+
+  it('en un ciclo cerrado habla de cómo cerró, anota el último día y avisa que se arrastra', () => {
+    const html = render({ item, date: '2020-10-31', phase: 'past' })
+    expect(html).toContain('Cerró con')
+    expect(html).not.toContain('Hoy tiene')
+    expect(html).toContain('el último día de este ciclo')
+    expect(html).toContain('se arrastra a los ciclos siguientes')
   })
 })

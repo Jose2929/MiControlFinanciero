@@ -43,8 +43,7 @@ function weeksText(daysLeft) {
 
 // Un sobre de gasto (Débito, Efectivo o el Fondo General) en el ciclo elegido.
 // `actions` ({ onAdd, onSpend, onAdjust, disabled }) pone los botones de
-// agregar dinero, registrar gasto y ajustar; sin él (ciclos cerrados) la tarjeta
-// es de solo lectura.
+// agregar dinero, registrar gasto y ajustar; sin él la tarjeta solo muestra.
 export function EnvelopeCard({ item, progress, actions }) {
   const { line, opening, assigned, spent, adjusted, balance, expected, paceDiff, perWeek, status } = item
   const isCurrent = progress.status === 'current'

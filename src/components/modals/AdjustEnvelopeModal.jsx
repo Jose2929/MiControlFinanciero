@@ -6,7 +6,7 @@ import { Select } from '../ui/Select'
 import { AdjustmentHistory } from '../budget/AdjustmentHistory'
 import { useBudget } from '../../context/BudgetContext'
 import { useFinance } from '../../context/FinanceContext'
-import { reconcileEnvelope } from '../../lib/budgetBalances'
+import { reconcileEnvelope, reconciliationEntry } from '../../lib/budgetBalances'
 import { formatShortDate, parseDateInputValue, toDateInputValue } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { money } from '../budget/money'
@@ -16,10 +16,10 @@ import { money } from '../budget/money'
 // (2) registrar como un gasto olvidado, que además baja la cuenta.
 //
 // item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo en pantalla.
-// date: fecha con la que se anota el ajuste (AAAA-MM-DD); hoy si no se indica.
-// allowExpense: false en un ciclo que aún no empieza, donde un gasto (que lleva su
-// fecha real) no contaría en este sobre.
-export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }) {
+// phase: 'current' | 'future' | 'past' (qué ciclo se está viendo).
+// date: fecha con la que se anota (AAAA-MM-DD); hoy si no se indica. En un ciclo
+// futuro un gasto no cuenta (lleva su fecha real), así que ahí solo se corrige el sobre.
+export function AdjustEnvelopeModal({ item, onClose, date, phase = 'current' }) {
   const { plan, addAdjustment } = useBudget()
   const { accounts, addExpense } = useFinance()
 
@@ -49,6 +49,7 @@ export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }
   const rec = reconcileEnvelope({ balance: item.balance, actual })
   const todayValue = toDateInputValue(new Date())
   const entryDate = date || todayValue
+  const allowExpense = phase !== 'future'
   const canRegisterAsExpense = allowExpense && rec?.kind === 'missing' && mediAccounts.length > 0
   const effectiveMode = rec?.kind === 'missing' && mode === 'expense' && canRegisterAsExpense ? 'expense' : 'adjust'
 
@@ -57,23 +58,16 @@ export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }
     if (!rec) return setError('Escribe cuánto tiene realmente.')
     if (Number(actual) < 0) return setError('La cantidad no puede ser negativa.')
     if (rec.kind === 'none') return onClose()
-    if (effectiveMode === 'expense') {
-      addExpense({
-        amount: Math.abs(rec.difference),
-        categoryId: 'otros',
-        accountId: accountId || mediAccounts[0].id,
-        envelopeId: item.line.id,
-        note: note.trim() || `Gasto sin registrar (${item.line.name})`,
-        date: toDateInputValue(new Date()),
-      })
-    } else {
-      addAdjustment({
-        envelopeId: item.line.id,
-        amount: rec.difference,
-        date: entryDate,
-        note: note.trim() || 'Conteo del sobre',
-      })
-    }
+    const entry = reconciliationEntry({
+      mode: effectiveMode,
+      difference: rec.difference,
+      envelope: item.line,
+      accountId: accountId || mediAccounts[0]?.id,
+      note,
+      date: entryDate, // dentro del ciclo que se corrige: hoy, o el último día si ya cerró
+    })
+    if (entry.type === 'expense') addExpense(entry.input)
+    else addAdjustment(entry.input)
     onClose()
   }
 
@@ -81,12 +75,12 @@ export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }
     <Modal open onClose={onClose} title={`Ajustar ${item.line.name}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-xl border border-line bg-surface2 p-4">
-          <p className="text-xs text-muted">Según la app tiene</p>
+          <p className="text-xs text-muted">{phase === 'past' ? 'Según la app cerró con' : 'Según la app tiene'}</p>
           <p className="text-2xl font-bold tabular-nums text-ink">{money(item.balance)}</p>
         </div>
 
         <Input
-          label="¿Cuánto tiene realmente?"
+          label={phase === 'past' ? '¿Con cuánto cerró realmente?' : '¿Cuánto tiene realmente?'}
           type="number"
           inputMode="decimal"
           min="0"
@@ -164,9 +158,12 @@ export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }
           </div>
         )}
 
-        {rec && rec.kind !== 'none' && effectiveMode === 'adjust' && entryDate !== todayValue && (
+        {rec && rec.kind !== 'none' && phase !== 'current' && entryDate !== todayValue && (
           <p className="text-xs text-muted">
-            Se anota con fecha del {formatShortDate(parseDateInputValue(entryDate))}, cuando empieza este ciclo.
+            {effectiveMode === 'expense' ? 'El gasto' : 'El ajuste'} se anota con fecha del{' '}
+            {formatShortDate(parseDateInputValue(entryDate))},{' '}
+            {phase === 'past' ? 'el último día de este ciclo' : 'cuando empieza este ciclo'}
+            {phase === 'past' && ', y se arrastra a los ciclos siguientes'}.
           </p>
         )}
 

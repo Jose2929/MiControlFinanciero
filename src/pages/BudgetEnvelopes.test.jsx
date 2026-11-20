@@ -231,7 +231,7 @@ describe('Sobres — agregar, gastar y ajustar', () => {
     expect(render()).not.toContain('Este ciclo todavía no empieza.')
   })
 
-  it('una tarjeta de ciclo cerrado no trae botones', () => {
+  it('una tarjeta sin acciones (o de ciclo cerrado) solo muestra, sin botones', () => {
     const closed = { status: 'past', daysLeft: 0, dayNumber: 30, totalDays: 30 }
     const item = {
       line: makePlan().lines[0],

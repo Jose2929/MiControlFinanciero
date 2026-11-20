@@ -3,7 +3,7 @@ import { Badge } from '../ui/Badge'
 import { formatShortDate } from '../../lib/format'
 
 // Selector de ciclo: ‹ 1 nov – 30 nov ›. Solo se puede ir del ciclo de
-// arranque al de hoy; los anteriores son de solo lectura.
+// arranque al de hoy.
 export function CycleNav({ cycle, progress, canPrev, canNext, onPrev, onNext }) {
   const isCurrent = progress.status === 'current'
   return (
@@ -24,7 +24,7 @@ export function CycleNav({ cycle, progress, canPrev, canNext, onPrev, onNext }) 
         </p>
         <div className="mt-0.5 flex items-center justify-center gap-1.5 text-xs text-muted">
           {isCurrent && <span>Día {progress.dayNumber} de {progress.totalDays}</span>}
-          {progress.status === 'past' && <Badge variant="neutral">Ciclo anterior · solo lectura</Badge>}
+          {progress.status === 'past' && <Badge variant="neutral">Ciclo anterior</Badge>}
           {progress.status === 'future' && <Badge variant="neutral">Aún no empieza</Badge>}
         </div>
       </div>

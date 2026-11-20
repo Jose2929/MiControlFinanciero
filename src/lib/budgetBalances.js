@@ -87,6 +87,36 @@ export function reconcileEnvelope({ balance, actual }) {
 }
 
 /**
+ * Qué se guarda al terminar de "Ajustar" un sobre cuando hay diferencia:
+ *   mode 'expense' → un gasto olvidado (baja el sobre y la cuenta);
+ *   mode 'adjust'  → solo una corrección del sobre (no toca cuentas).
+ * `date` (AAAA-MM-DD) es la fecha dentro del ciclo que se está corrigiendo: hoy
+ * en el ciclo en curso, el último día en uno cerrado.
+ *
+ * @returns {{ type: 'expense' | 'adjustment', input: object }}
+ */
+export function reconciliationEntry({ mode, difference, envelope, accountId, note, date }) {
+  const text = typeof note === 'string' ? note.trim() : ''
+  if (mode === 'expense') {
+    return {
+      type: 'expense',
+      input: {
+        amount: Math.abs(difference),
+        categoryId: 'otros',
+        accountId,
+        envelopeId: envelope.id,
+        note: text || `Gasto sin registrar (${envelope.name})`,
+        date,
+      },
+    }
+  }
+  return {
+    type: 'adjustment',
+    input: { envelopeId: envelope.id, amount: difference, date, note: text || 'Conteo del sobre' },
+  }
+}
+
+/**
  * Monto con signo de un movimiento manual del sobre: agregar suma, sacar resta.
  * Devuelve null si lo escrito no es un monto válido (vacío, cero, negativo, no
  * numérico), así la pantalla no tiene que repetir esa validación.

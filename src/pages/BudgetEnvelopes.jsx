@@ -130,21 +130,21 @@ export default function BudgetEnvelopes() {
   const fondo = items.filter((i) => i.line.kind === 'fondo')
   const pockets = items.filter((i) => i.line.kind === 'bolsillo')
   const noAccounts = Object.keys(plan.accountMedios).length === 0
-  // Agregar, gastar y ajustar valen en el ciclo en curso y también en uno que
-  // aún no empieza (para dejar listos los saldos iniciales); un ciclo cerrado
-  // es de solo lectura. Lo que se anota a mano en un ciclo futuro lleva la fecha
-  // en que ese ciclo empieza, así sí cuenta ahí; un gasto, en cambio, siempre
-  // lleva su fecha real (hoy), por eso en un ciclo futuro no descuenta del sobre.
-  const isFuture = result.progress.status === 'future'
-  const movementDate = toDateInputValue(isFuture ? cycle.start : new Date())
-  const actionsFor = (item) =>
-    result.isPast
-      ? undefined
-      : {
-          onAdd: (it) => setMoving({ id: it.line.id, direction: 'in' }),
-          onSpend: accountByMedio[item.line.medio] ? setSpending : undefined,
-          onAdjust: setAdjusting,
-        }
+  // Agregar, gastar y ajustar valen en cualquier ciclo visible. Lo que se anota a
+  // mano lleva una fecha que cae dentro del ciclo que se está viendo, para que
+  // cuente ahí: hoy en el ciclo en curso, el día que empieza en uno futuro (sirve
+  // para dejar listos los saldos iniciales) y el último día en uno cerrado (se
+  // arrastra a los ciclos siguientes). Un gasto, en cambio, lleva su fecha real:
+  // en uno cerrado se elige dentro del ciclo; en uno futuro no puede descontar.
+  const phase = result.isPast ? 'past' : result.progress.status === 'future' ? 'future' : 'current'
+  const isFuture = phase === 'future'
+  const movementDate = toDateInputValue(phase === 'past' ? cycle.end : isFuture ? cycle.start : new Date())
+  const cycleRangeText = `${formatShortDate(cycle.start)} – ${formatShortDate(cycle.end)}`
+  const actionsFor = (item) => ({
+    onAdd: (it) => setMoving({ id: it.line.id, direction: 'in' }),
+    onSpend: accountByMedio[item.line.medio] ? setSpending : undefined,
+    onAdjust: setAdjusting,
+  })
 
   return (
     <div className="space-y-5">
@@ -169,6 +169,17 @@ export default function BudgetEnvelopes() {
               Plan → Fechas y ciclo
             </Link>
             .
+          </p>
+        </Card>
+      )}
+
+      {phase === 'past' && (
+        <Card className="p-4">
+          <p className="text-sm text-ink">Ciclo cerrado.</p>
+          <p className="mt-1 text-xs text-muted">
+            Si olvidaste algo, puedes corregirlo: lo que agregues, saques o ajustes aquí se anota con fecha del{' '}
+            {formatShortDate(cycle.end)} y se arrastra a los ciclos siguientes. Un gasto lleva la fecha que elijas dentro
+            de este ciclo.
           </p>
         </Card>
       )}
@@ -270,13 +281,14 @@ export default function BudgetEnvelopes() {
       <AdjustEnvelopeModal
         item={adjusting ? items.find((i) => i.line.id === adjusting.line.id) || null : null}
         date={movementDate}
-        allowExpense={!isFuture}
+        phase={phase}
         onClose={() => setAdjusting(null)}
       />
       <EnvelopeMoneyModal
         item={moving ? items.find((i) => i.line.id === moving.id) || null : null}
         direction={moving?.direction}
         date={movementDate}
+        phase={phase}
         onClose={() => setMoving(null)}
       />
       {/* Se monta solo mientras está abierto: así arranca con la cuenta y el sobre ya elegidos. */}
@@ -284,11 +296,17 @@ export default function BudgetEnvelopes() {
         <AddExpenseModal
           open
           title={`Gasto en ${spending.line.name}`}
-          preset={{ accountId: accountByMedio[spending.line.medio], envelopeId: spending.line.id }}
+          preset={{
+            accountId: accountByMedio[spending.line.medio],
+            envelopeId: spending.line.id,
+            ...(phase === 'past' && { date: movementDate, minDate: toDateInputValue(cycle.start), maxDate: movementDate }),
+          }}
           notice={
             isFuture
               ? `Este ciclo arranca el ${formatShortDate(cycle.start)}. El gasto se guarda hoy en tus cuentas y en Registro, pero no descuenta de este sobre.`
-              : undefined
+              : phase === 'past'
+                ? `Estás corrigiendo un ciclo cerrado (${cycleRangeText}). Elige una fecha dentro de ese ciclo; el gasto baja tu cuenta y el sobre de ese ciclo.`
+                : undefined
           }
           onClose={() => setSpending(null)}
         />

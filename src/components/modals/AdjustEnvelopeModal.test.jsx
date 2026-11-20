@@ -41,6 +41,19 @@ describe('AdjustEnvelopeModal', () => {
     expect(html).toContain('¿Cuánto tiene realmente?')
   })
 
+  it('en un ciclo cerrado pregunta con cuánto cerró, no cuánto tiene hoy', () => {
+    const html = render({ item, phase: 'past', date: '2020-10-31' })
+    expect(html).toContain('Según la app cerró con')
+    expect(html).toContain('¿Con cuánto cerró realmente?')
+    expect(html).not.toContain('¿Cuánto tiene realmente?')
+  })
+
+  it('en el ciclo en curso mantiene las preguntas de siempre', () => {
+    const html = render({ item })
+    expect(html).toContain('Según la app tiene')
+    expect(html).toContain('¿Cuánto tiene realmente?')
+  })
+
   it('sin escribir nada todavía no ofrece qué hacer con la diferencia ni deja enviar', () => {
     const html = render({ item })
     expect(html).not.toContain('¿Qué hacemos con la diferencia?')

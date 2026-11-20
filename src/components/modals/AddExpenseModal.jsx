@@ -14,8 +14,9 @@ import { formatMoney, toDateInputValue } from '../../lib/format'
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
 // `notice` es un aviso opcional que se muestra arriba del formulario.
-// `preset` ({ accountId, envelopeId }) abre el formulario con la cuenta y el
-// sobre ya elegidos; se lee al montar, así que quien lo use debe montarlo solo
+// `preset` ({ accountId, envelopeId, date, minDate, maxDate }) abre el formulario
+// con la cuenta y el sobre ya elegidos, y la fecha propuesta y su rango
+// permitido (AAAA-MM-DD; para corregir un ciclo cerrado); se lee al montar, así que quien lo use debe montarlo solo
 // mientras está abierto (como hace la pantalla de Sobres).
 export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar gasto', notice }) {
   const { allCategories, accounts, transactions, addExpense, addExpenseDeferred } = useFinance()
@@ -25,7 +26,7 @@ export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar
   const [subcategoryId, setSubcategoryId] = useState(null)
   const [accountId, setAccountId] = useState(preset?.accountId || accounts[0]?.id)
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(toDateInputValue(new Date()))
+  const [date, setDate] = useState(preset?.date || toDateInputValue(new Date()))
   const [error, setError] = useState('')
 
   const [paysCard, setPaysCard] = useState(false)
@@ -303,7 +304,14 @@ export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />
+          <Input
+            label="Fecha"
+            type="date"
+            value={date}
+            min={preset?.minDate}
+            max={preset?.maxDate || toDateInputValue(new Date())}
+            onChange={(e) => setDate(e.target.value)}
+          />
           <Input label="Nota (opcional)" placeholder="Ej. Cena con amigos" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 

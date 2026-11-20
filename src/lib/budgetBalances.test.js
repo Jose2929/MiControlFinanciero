@@ -7,6 +7,7 @@ import {
   findUnclassified,
   isEnvelopeLine,
   movementAmount,
+  reconciliationEntry,
 } from './budgetBalances'
 import { normalizePlan } from './budgetPlan'
 import { line } from './budgetFixtures'
@@ -361,5 +362,51 @@ describe('movementAmount — agregar o sacar dinero de un sobre', () => {
       expect(movementAmount('in', raw)).toBeNull()
       expect(movementAmount('out', raw)).toBeNull()
     }
+  })
+})
+
+describe('reconciliationEntry — qué se guarda al ajustar un sobre', () => {
+  const envelope = { id: 'd-mand', name: 'Mandado' }
+
+  it('un gasto olvidado va con la fecha del ciclo que se corrige (no la de hoy)', () => {
+    const { type, input } = reconciliationEntry({
+      mode: 'expense',
+      difference: -1000,
+      envelope,
+      accountId: 'acc-deb',
+      note: '',
+      date: '2026-10-31',
+    })
+    expect(type).toBe('expense')
+    expect(input).toEqual({
+      amount: 1000,
+      categoryId: 'otros',
+      accountId: 'acc-deb',
+      envelopeId: 'd-mand',
+      note: 'Gasto sin registrar (Mandado)',
+      date: '2026-10-31',
+    })
+  })
+
+  it('una corrección conserva el signo de la diferencia y su fecha', () => {
+    const missing = reconciliationEntry({ mode: 'adjust', difference: -650, envelope, note: '  ', date: '2026-10-31' })
+    expect(missing).toEqual({
+      type: 'adjustment',
+      input: { envelopeId: 'd-mand', amount: -650, date: '2026-10-31', note: 'Conteo del sobre' },
+    })
+    const extra = reconciliationEntry({ mode: 'adjust', difference: 280, envelope, note: 'Me sobró', date: '2026-12-01' })
+    expect(extra.input).toMatchObject({ amount: 280, date: '2026-12-01', note: 'Me sobró' })
+  })
+
+  it('la nota que escribe la persona manda sobre la de por defecto', () => {
+    const { input } = reconciliationEntry({
+      mode: 'expense',
+      difference: -90,
+      envelope,
+      accountId: 'a',
+      note: ' Tacos ',
+      date: '2026-11-19',
+    })
+    expect(input.note).toBe('Tacos')
   })
 })

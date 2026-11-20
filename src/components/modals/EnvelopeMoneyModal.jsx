@@ -24,9 +24,10 @@ const HELP = {
 // ni mueve tus cuentas.
 //
 // item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo en pantalla.
+// phase: 'current' | 'future' | 'past' (qué ciclo se está viendo).
 // date: fecha con la que se anota (AAAA-MM-DD); hoy si no se indica. En un ciclo
-// que aún no empieza es el día en que empieza, para que cuente ahí.
-export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', date, onClose }) {
+// futuro es el día en que empieza y en uno cerrado el último día, para que cuente ahí.
+export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', date, phase = 'current', onClose }) {
   const { addAdjustment } = useBudget()
   const [direction, setDirection] = useState(initialDirection)
   const [amount, setAmount] = useState('')
@@ -68,7 +69,7 @@ export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', d
     <Modal open onClose={onClose} title={direction === 'in' ? `Agregar a ${item.line.name}` : `Sacar de ${item.line.name}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-xl border border-line bg-surface2 p-4">
-          <p className="text-xs text-muted">Hoy tiene</p>
+          <p className="text-xs text-muted">{phase === 'past' ? 'Cerró con' : 'Hoy tiene'}</p>
           <p className={cn('text-2xl font-bold tabular-nums', item.balance < 0 ? 'text-negative' : 'text-ink')}>
             {money(item.balance)}
           </p>
@@ -96,9 +97,11 @@ export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', d
           ))}
         </div>
         <p className="-mt-1 text-xs text-muted">{HELP[direction]}</p>
-        {entryDate !== todayValue && (
+        {phase !== 'current' && entryDate !== todayValue && (
           <p className="text-xs text-muted">
-            Se anota con fecha del {formatShortDate(parseDateInputValue(entryDate))}, cuando empieza este ciclo.
+            Se anota con fecha del {formatShortDate(parseDateInputValue(entryDate))},{' '}
+            {phase === 'past' ? 'el último día de este ciclo' : 'cuando empieza este ciclo'}
+            {phase === 'past' && ', y se arrastra a los ciclos siguientes'}.
           </p>
         )}
 

@@ -124,7 +124,7 @@ export function writeAccountMedios(householdId, uid, patch) {
 
 /**
  * Reemplaza ajustes, ingresos y líneas de una sola vez (importar un plan).
- * No toca otros hijos del nodo (p. ej. las casillas de la quincena).
+ * No toca otros hijos del nodo (p. ej. las palomitas del calendario).
  */
 export function replacePlan(householdId, uid, plan) {
   const base = basePath(householdId)

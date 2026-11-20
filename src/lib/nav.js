@@ -8,7 +8,6 @@ import {
   TrendingUp,
   Repeat,
   Bell,
-  ArrowLeftRight,
   CalendarDays,
   SlidersHorizontal,
 } from 'lucide-react'
@@ -69,14 +68,12 @@ export const MORE_MENU_ITEMS = [
 // marcado también en /presupuesto/plan, etc.
 export const BUDGET_NAV_ITEMS = [
   { to: '/presupuesto', label: 'Sobres', icon: Wallet, end: true },
-  { to: '/presupuesto/quincena', label: 'Quincena', icon: ArrowLeftRight },
   { to: '/presupuesto/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/presupuesto/plan', label: 'Plan', icon: SlidersHorizontal },
 ]
 
 const PAGE_TITLES = {
   '/presupuesto': 'Sobres',
-  '/presupuesto/quincena': 'Quincena',
   '/presupuesto/calendario': 'Calendario',
   '/presupuesto/plan': 'Plan del presupuesto',
   '/dashboard': 'Dashboard',

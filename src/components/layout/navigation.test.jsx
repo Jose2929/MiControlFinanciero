@@ -33,7 +33,7 @@ describe('getAppMode', () => {
     expect(getAppMode('/presupuesto')).toBe('presupuesto')
     expect(getAppMode('/presupuesto/')).toBe('presupuesto')
     expect(getAppMode('/presupuesto/plan')).toBe('presupuesto')
-    expect(getAppMode('/presupuesto/quincena')).toBe('presupuesto')
+    expect(getAppMode('/presupuesto/calendario')).toBe('presupuesto')
   })
 
   it('todo lo demás es Registro — incluido /presupuestos (límites por categoría)', () => {
@@ -54,7 +54,7 @@ describe('getAppMode', () => {
 
 describe('rutas y títulos', () => {
   it('cada pestaña de Presupuesto vive bajo /presupuesto y tiene título propio', () => {
-    expect(BUDGET_NAV_ITEMS).toHaveLength(4)
+    expect(BUDGET_NAV_ITEMS).toHaveLength(3)
     for (const item of BUDGET_NAV_ITEMS) {
       expect(getAppMode(item.to)).toBe('presupuesto')
       expect(getPageTitle(item.to)).not.toBe('Mi Control Financiero')
@@ -78,17 +78,18 @@ describe('BottomNav', () => {
     for (const label of ['Inicio', 'Gastos', 'Presupuestos', 'Deudas', 'Perfil']) {
       expect(html).toContain(label)
     }
-    for (const label of ['Sobres', 'Quincena', 'Calendario']) {
+    for (const label of ['Sobres', 'Calendario']) {
       expect(html).not.toContain(label)
     }
     expect(activeHrefs(html)).toEqual(['/gastos'])
   })
 
-  it('en Presupuesto muestra sus 4 pestañas y ninguna de Registro', () => {
+  it('en Presupuesto muestra sus 3 pestañas y ninguna de Registro', () => {
     const html = render(<BottomNav />, '/presupuesto/plan')
-    for (const label of ['Sobres', 'Quincena', 'Calendario', 'Plan']) {
+    for (const label of ['Sobres', 'Calendario', 'Plan']) {
       expect(html).toContain(label)
     }
+    expect(html).not.toContain('Quincena')
     expect(html).not.toContain('Inicio')
     expect(html).not.toContain('Deudas')
     expect(activeHrefs(html)).toEqual(['/presupuesto/plan'])
@@ -96,8 +97,8 @@ describe('BottomNav', () => {
 
   it('"Sobres" solo se marca en /presupuesto exacto, no en sus subpantallas', () => {
     expect(isActive(render(<BottomNav />, '/presupuesto'), '/presupuesto')).toBe(true)
-    expect(isActive(render(<BottomNav />, '/presupuesto/quincena'), '/presupuesto')).toBe(false)
-    expect(isActive(render(<BottomNav />, '/presupuesto/quincena'), '/presupuesto/quincena')).toBe(true)
+    expect(isActive(render(<BottomNav />, '/presupuesto/calendario'), '/presupuesto')).toBe(false)
+    expect(isActive(render(<BottomNav />, '/presupuesto/calendario'), '/presupuesto/calendario')).toBe(true)
   })
 
   it('/presupuestos (el viejo) sigue en Registro con su pestaña activa', () => {
@@ -110,7 +111,7 @@ describe('BottomNav', () => {
 
 describe('ModeSwitch', () => {
   it('marca Presupuesto dentro del apartado Presupuesto', () => {
-    expect(switchTabs(render(<ModeSwitch />, '/presupuesto/quincena'))).toEqual([
+    expect(switchTabs(render(<ModeSwitch />, '/presupuesto/calendario'))).toEqual([
       ['false', 'Registro'],
       ['true', 'Presupuesto'],
     ])

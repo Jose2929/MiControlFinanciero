@@ -13,7 +13,9 @@ import { PocketCard } from '../components/budget/PocketCard'
 import { RulesNotice } from '../components/budget/RulesNotice'
 import { StartCycleCard } from '../components/budget/StartCycleCard'
 import { UnclassifiedCard } from '../components/budget/UnclassifiedCard'
+import { AdjustEnvelopeModal } from '../components/modals/AdjustEnvelopeModal'
 import { money } from '../components/budget/money'
+import { formatSignedMoney } from '../lib/format'
 import { cn } from '../lib/cn'
 
 function Section({ title, description, total, children }) {
@@ -44,6 +46,7 @@ export default function BudgetEnvelopes() {
   const { transactions, accounts, findCategory, updateTransaction } = useFinance()
   const today = useMemo(() => new Date(), [])
   const [back, setBack] = useState(0) // cuántos ciclos hacia atrás del último visible
+  const [adjusting, setAdjusting] = useState(null) // sobre que se está contando
 
   const range = useMemo(() => (hasPlan ? cycleRange(plan, today) : null), [hasPlan, plan, today])
   const cycleCount = useMemo(() => (range ? cyclesBetween(range.first, range.last).length : 0), [range])
@@ -114,6 +117,8 @@ export default function BudgetEnvelopes() {
   const fondo = items.filter((i) => i.line.kind === 'fondo')
   const pockets = items.filter((i) => i.line.kind === 'bolsillo')
   const noAccounts = Object.keys(plan.accountMedios).length === 0
+  // Contar un sobre solo tiene sentido en el ciclo en curso.
+  const onAdjust = result.isCurrent ? setAdjusting : undefined
 
   return (
     <div className="space-y-5">
@@ -152,6 +157,15 @@ export default function BudgetEnvelopes() {
         <p className="mt-2 text-xs text-muted">
           Asignado del ciclo {money(result.spendTotals.assigned)} · Gastado {money(result.spendTotals.spent)}
           {result.spendTotals.opening !== 0 && <> · Arrastre {money(result.spendTotals.opening)}</>}
+          {result.spendTotals.adjusted !== 0 && (
+            <>
+              {' '}
+              · Ajustes{' '}
+              {formatSignedMoney(result.spendTotals.adjusted, {
+                cents: !Number.isInteger(result.spendTotals.adjusted),
+              })}
+            </>
+          )}
         </p>
       </Card>
 
@@ -180,7 +194,7 @@ export default function BudgetEnvelopes() {
       {debito.length > 0 && (
         <Section title="Débito" description="Gasto diario" total={totalOf(debito)}>
           {debito.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
           ))}
         </Section>
       )}
@@ -188,7 +202,7 @@ export default function BudgetEnvelopes() {
       {efectivo.length > 0 && (
         <Section title="Efectivo" description="Lo que retiras del débito" total={totalOf(efectivo)}>
           {efectivo.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
           ))}
         </Section>
       )}
@@ -196,7 +210,7 @@ export default function BudgetEnvelopes() {
       {fondo.length > 0 && (
         <Section title="Fondo general" description="Para cualquier gasto" total={totalOf(fondo)}>
           {fondo.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
           ))}
         </Section>
       )}
@@ -204,10 +218,17 @@ export default function BudgetEnvelopes() {
       {pockets.length > 0 && (
         <Section title="Bolsillos de TDC2" description="Lo que apartas cada mes para cobros del año">
           {pockets.map((item) => (
-            <PocketCard key={item.line.id} item={item} />
+            <PocketCard key={item.line.id} item={item} onAdjust={onAdjust} />
           ))}
         </Section>
       )}
+
+      {/* El sobre que se cuenta se vuelve a buscar en el resultado actual, así
+          el saldo "según la app" siempre está al día. */}
+      <AdjustEnvelopeModal
+        item={adjusting ? items.find((i) => i.line.id === adjusting.line.id) || null : null}
+        onClose={() => setAdjusting(null)}
+      />
     </div>
   )
 }

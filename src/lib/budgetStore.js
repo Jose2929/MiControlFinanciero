@@ -19,7 +19,7 @@
 
 import { ref, onValue, update, push } from 'firebase/database'
 import { db } from './firebase'
-import { PLAN_VERSION, incomeToTree, lineToTree, planToTree } from './budgetPlan'
+import { PLAN_VERSION, adjustmentToTree, incomeToTree, lineToTree, planToTree } from './budgetPlan'
 
 const basePath = (householdId) => `households/${householdId}/budget`
 
@@ -61,8 +61,34 @@ export function writeLine(householdId, uid, line) {
   return commit({ ...stamp(householdId, uid), [`${basePath(householdId)}/lines/${line.id}`]: lineToTree(line) })
 }
 
-export function deleteLine(householdId, uid, lineId) {
-  return commit({ ...stamp(householdId, uid), [`${basePath(householdId)}/lines/${lineId}`]: null })
+/**
+ * Borra un renglón y, en la misma escritura, las ligas categoría → sobre que
+ * apuntaban a él (`links`: [{ medio, categoryId }]) para no dejar ligas colgando.
+ */
+export function deleteLine(householdId, uid, lineId, links = []) {
+  const base = basePath(householdId)
+  const updates = { ...stamp(householdId, uid), [`${base}/lines/${lineId}`]: null }
+  for (const { medio, categoryId } of links) updates[`${base}/categoryEnvelopes/${medio}/${categoryId}`] = null
+  return commit(updates)
+}
+
+/** Liga (o desliga, con lineId null) una categoría con un sobre de un medio. */
+export function writeCategoryEnvelope(householdId, uid, medio, categoryId, lineId) {
+  return commit({
+    ...stamp(householdId, uid),
+    [`${basePath(householdId)}/categoryEnvelopes/${medio}/${categoryId}`]: lineId,
+  })
+}
+
+export function writeAdjustment(householdId, uid, adjustment) {
+  return commit({
+    ...stamp(householdId, uid),
+    [`${basePath(householdId)}/adjustments/${adjustment.id}`]: adjustmentToTree(adjustment),
+  })
+}
+
+export function deleteAdjustment(householdId, uid, adjustmentId) {
+  return commit({ ...stamp(householdId, uid), [`${basePath(householdId)}/adjustments/${adjustmentId}`]: null })
 }
 
 export function writeIncome(householdId, uid, income) {

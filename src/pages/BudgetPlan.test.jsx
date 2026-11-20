@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import BudgetPlan from './BudgetPlan'
 import { BudgetContext } from '../context/BudgetContext'
 import { FinanceContext } from '../context/FinanceContext'
+import { CATEGORIES } from '../lib/categories'
 import { createEmptyPlan } from '../lib/budget'
 import { normalizePlan } from '../lib/budgetPlan'
 import { fixtureAccounts, fixturePlan } from '../lib/budgetFixtures'
@@ -28,7 +29,7 @@ function render(overrides = {}, mutate, accounts = fixtureAccounts()) {
     ...overrides,
   }
   return renderToStaticMarkup(
-    <FinanceContext.Provider value={{ accounts }}>
+    <FinanceContext.Provider value={{ accounts, allCategories: CATEGORIES }}>
       <BudgetContext.Provider value={value}>
         <BudgetPlan />
       </BudgetContext.Provider>
@@ -119,6 +120,49 @@ describe('Plan — cuentas de la app', () => {
 
   it('sin cuentas registradas lo dice', () => {
     expect(render({}, undefined, [])).toContain('Aún no tienes cuentas registradas')
+  })
+})
+
+describe('Plan — categorías y sobres', () => {
+  it('muestra un bloque por cada medio de gasto con sobres, con todas las categorías', () => {
+    const html = render()
+    expect(html).toContain('Categorías y sobres')
+    // Débito y Efectivo tienen sobres en el plan de ejemplo; TDC2 tiene bolsillos y fondo.
+    for (const medio of ['Débito', 'Efectivo', 'TDC2']) {
+      expect(html).toContain(`>${medio}</p>`)
+    }
+    for (const category of CATEGORIES) {
+      expect(html).toContain(`Sobre de ${category.label} en Débito`)
+    }
+    expect(html).toContain('Sobre para todo lo demás en Efectivo')
+  })
+
+  it('no ofrece ligas para la TDC (solo cargos fijos) ni para el ahorro', () => {
+    const html = render()
+    expect(html).not.toContain('en TDC"')
+    expect(html).not.toContain('en Ahorro')
+  })
+
+  it('marca como elegido el sobre ya ligado', () => {
+    const html = render({}, (plan) => {
+      plan.categoryEnvelopes = { debito: { comida: 'sobre-d1' } }
+    })
+    expect(html).toMatch(/aria-label="Sobre de Comida en Débito"[^>]*>(?:(?!<\/select>).)*<option value="sobre-d1" selected="">/s)
+  })
+
+  it('una liga a un sobre que ya no existe se muestra como "Ninguno"', () => {
+    const html = render({}, (plan) => {
+      plan.categoryEnvelopes = { debito: { comida: 'borrado' } }
+    })
+    expect(html).not.toContain('value="borrado"')
+    expect(html).toMatch(/aria-label="Sobre de Comida en Débito"[^>]*>(?:(?!<\/select>).)*<option value="" selected="">Ninguno/s)
+  })
+
+  it('sin sobres en el plan no muestra la tarjeta', () => {
+    const html = render({}, (plan) => {
+      plan.lines = plan.lines.filter((l) => l.medio === 'tdc' || l.medio === 'ahorro')
+    })
+    expect(html).not.toContain('Categorías y sobres')
   })
 })
 

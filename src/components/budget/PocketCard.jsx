@@ -1,12 +1,13 @@
 import { Card } from '../ui/Card'
 import { cn } from '../../lib/cn'
 import { targetPerPayment } from '../../lib/budget'
+import { formatSignedMoney } from '../../lib/format'
 import { FREQUENCY_LABELS, money } from './money'
 
 // Un bolsillo de TDC2 (Seguro Moto, Tenencia…): lo que se aparta cada mes se
 // acumula hasta que llega el cobro, y cuando se ocupa se descuenta de aquí.
-export function PocketCard({ item }) {
-  const { line, assigned, spent, balance } = item
+export function PocketCard({ item, onAdjust }) {
+  const { line, assigned, spent, adjusted, balance } = item
   const target = targetPerPayment(line)
   const percent = target > 0 ? Math.max(0, Math.min((balance / target) * 100, 100)) : 0
   const missing = target != null ? Math.max(target - balance, 0) : null
@@ -25,6 +26,16 @@ export function PocketCard({ item }) {
           <p className={cn('text-lg font-bold tabular-nums', balance < 0 ? 'text-negative' : 'text-ink')}>
             {money(balance)}
           </p>
+          {onAdjust && (
+            <button
+              type="button"
+              onClick={() => onAdjust(item)}
+              aria-label={`Contar ${line.name}`}
+              className="text-xs font-medium text-brand-400 hover:text-brand-300"
+            >
+              Contar
+            </button>
+          )}
         </div>
       </div>
 
@@ -43,9 +54,12 @@ export function PocketCard({ item }) {
         </div>
       )}
 
-      {(spent > 0 || assigned === 0) && (
+      {(spent > 0 || adjusted !== 0 || assigned === 0) && (
         <p className="mt-1 text-xs text-muted">
           {spent > 0 && <>Gastado en este ciclo {money(spent)}. </>}
+          {adjusted !== 0 && (
+            <>Ajuste {formatSignedMoney(adjusted, { cents: !Number.isInteger(adjusted) })}. </>
+          )}
           {assigned === 0 && 'Todavía no acumula en este ciclo.'}
         </p>
       )}

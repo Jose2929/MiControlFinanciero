@@ -66,8 +66,22 @@ export const DEFAULT_SETTINGS = {
 // presupuesto: { 'acc-1001': 'tdc', ... }. Una cuenta que no aparece ahí queda
 // fuera del presupuesto. Es configuración del hogar, no parte del plan que se
 // exporta/importa.
+// `categoryEnvelopes` liga categorías con sobres, POR MEDIO:
+//   { debito: { comida: 'debito-mandado', '*': 'debito-gasolina' }, ... }
+// La clave '*' es "todo lo demás" de ese medio. `adjustments` son los conteos
+// físicos ("este sobre tiene en realidad $X"). Los tres —cuentas, ligas y
+// ajustes— son configuración e historial del hogar, no parte del plan que se
+// exporta/importa.
 export function createEmptyPlan() {
-  return { version: 1, settings: { ...DEFAULT_SETTINGS }, incomes: [], lines: [], accountMedios: {} }
+  return {
+    version: 1,
+    settings: { ...DEFAULT_SETTINGS },
+    incomes: [],
+    lines: [],
+    accountMedios: {},
+    categoryEnvelopes: {},
+    adjustments: [],
+  }
 }
 
 // -- Dinero (centavos enteros) ----------------------------------------------

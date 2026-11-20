@@ -16,6 +16,17 @@ export const ACCOUNT_TYPE_LABELS = {
   ahorro: 'Ahorro',
 }
 
+// Líneas que funcionan como sobre o bolsillo. Los cargos de la TDC y los
+// ahorros programados no son sobres: no se gasta "contra" ellos.
+const ENVELOPE_KINDS = ['sobre', 'fondo', 'bolsillo']
+
+export function isEnvelopeLine(line) {
+  return ENVELOPE_KINDS.includes(line.kind)
+}
+
+// Clave de "todo lo demás" dentro de las ligas categoría → sobre de un medio.
+export const CATCH_ALL = '*'
+
 const normalizeText = (value) =>
   String(value ?? '')
     .normalize('NFD')
@@ -54,18 +65,62 @@ export function countsTowardEnvelope(transaction) {
 }
 
 /**
+ * Sobre que le toca a una categoría en un medio, según las ligas del plan:
+ * el de la categoría, o si no hay, el de "todo lo demás". null si no hay
+ * ninguno o si la línea ligada ya no existe (o es de otro medio).
+ */
+export function ruleEnvelopeFor(plan, medio, categoryId) {
+  const links = plan?.categoryEnvelopes?.[medio]
+  if (!links) return null
+  const valid = new Set(
+    (plan.lines || []).filter((l) => l.medio === medio && isEnvelopeLine(l)).map((l) => l.id)
+  )
+  const own = links[categoryId]
+  if (own && valid.has(own)) return own
+  const rest = links[CATCH_ALL]
+  return rest && valid.has(rest) ? rest : null
+}
+
+/**
+ * Devuelve una función `(transacción) → id del sobre | null` — LA forma de
+ * saber contra qué sobre cuenta un gasto:
+ *   1. el sobre elegido a mano en la operación (`envelopeId`), si todavía existe;
+ *   2. si no, el que le toca a su categoría en el medio de su cuenta.
+ * Así los gastos de antes, los que registra la app de Android y los
+ * recurrentes también restan de su sobre sin tener que clasificarlos uno a uno.
+ * Solo cuentan los gastos reales: no pagos de tarjeta ni gastos pasados a MSI.
+ */
+export function makeEnvelopeResolver(plan) {
+  const lineIds = new Set((plan.lines || []).filter(isEnvelopeLine).map((l) => l.id))
+  const ruleCache = new Map()
+  return (t) => {
+    if (!t || t.type !== 'expense' || t.convertedToMsi || t.counterAccountId) return null
+    if (t.envelopeId && lineIds.has(t.envelopeId)) return t.envelopeId
+    const medio = getAccountMedio(plan, t.accountId)
+    if (!medio || medio === 'ahorro') return null
+    const key = `${medio}|${t.categoryId}`
+    if (!ruleCache.has(key)) ruleCache.set(key, ruleEnvelopeFor(plan, medio, t.categoryId))
+    return ruleCache.get(key)
+  }
+}
+
+/**
  * Sobre sugerido para un gasto nuevo. Nunca asigna solo: la pantalla lo deja
  * preseleccionado y el usuario lo confirma o lo cambia.
- *   1. historial: el sobre que más has usado en gastos de esa categoría con
+ *   1. liga: el sobre ligado a esa categoría en el plan;
+ *   2. historial: el sobre que más has usado en gastos de esa categoría con
  *      cuentas del mismo medio;
- *   2. nombre: el sobre que se llama igual que la categoría.
+ *   3. nombre: el sobre que se llama igual que la categoría.
  *
- * @returns {{ lineId: string, reason: 'history' | 'name' } | null}
+ * @returns {{ lineId: string, reason: 'rule' | 'history' | 'name' } | null}
  */
 export function suggestEnvelope({ plan, accountId, categoryId, categoryLabel, transactions = [] }) {
   const options = envelopeOptions(plan, accountId)
   if (options.length === 0) return null
   const optionIds = new Set(options.map((line) => line.id))
+
+  const ruled = ruleEnvelopeFor(plan, getAccountMedio(plan, accountId), categoryId)
+  if (ruled && optionIds.has(ruled)) return { lineId: ruled, reason: 'rule' }
 
   const counts = new Map()
   for (const t of transactions) {

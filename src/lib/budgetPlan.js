@@ -169,6 +169,60 @@ export function normalizeAccountMedios(raw) {
   return out
 }
 
+// -- Categorías ↔ sobres ----------------------------------------------------
+
+/** { [medio]: { [categoryId | '*']: lineId } } → solo medios válidos y ids de texto. */
+export function normalizeCategoryEnvelopes(raw) {
+  const out = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+  for (const [medio, links] of Object.entries(raw)) {
+    if (!MEDIO_ORDER.includes(medio) || !links || typeof links !== 'object' || Array.isArray(links)) continue
+    const clean = {}
+    for (const [categoryId, lineId] of Object.entries(links)) {
+      if (typeof lineId === 'string' && lineId) clean[categoryId] = lineId
+    }
+    if (Object.keys(clean).length > 0) out[medio] = clean
+  }
+  return out
+}
+
+// -- Ajustes de sobre (conteos físicos) -------------------------------------
+
+/** "2026-11-19" → true si es una fecha real. */
+export function isValidDateKey(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+}
+
+/** Ajuste crudo → ajuste limpio, o null si no tiene sobre, monto o fecha válidos. */
+export function normalizeAdjustment(raw, fallbackId = '') {
+  if (!raw || typeof raw !== 'object') return null
+  const amount = toNumber(raw.amount)
+  if (typeof raw.envelopeId !== 'string' || !raw.envelopeId) return null
+  if (!Number.isFinite(amount) || amount === 0 || !isValidDateKey(raw.date)) return null
+  return {
+    id: safeId(raw.id || fallbackId),
+    envelopeId: raw.envelopeId,
+    amount: roundCents(amount),
+    date: raw.date,
+    note: typeof raw.note === 'string' ? raw.note.trim() : '',
+    createdBy: typeof raw.createdBy === 'string' ? raw.createdBy : null,
+  }
+}
+
+export function adjustmentToTree(adjustment) {
+  return {
+    id: adjustment.id,
+    envelopeId: adjustment.envelopeId,
+    amount: adjustment.amount,
+    date: adjustment.date,
+    note: adjustment.note || '',
+    createdBy: adjustment.createdBy ?? null,
+  }
+}
+
 // -- Plan completo ----------------------------------------------------------
 
 /** Nodo crudo (RTDB, archivo importado o null) → plan limpio. Nunca lanza. */
@@ -177,6 +231,11 @@ export function normalizePlan(raw) {
   if (!raw || typeof raw !== 'object') return plan
   plan.settings = normalizeSettings(raw.settings)
   plan.accountMedios = normalizeAccountMedios(raw.accountMedios)
+  plan.categoryEnvelopes = normalizeCategoryEnvelopes(raw.categoryEnvelopes)
+  plan.adjustments = entriesOf(raw.adjustments)
+    .map(([key, v]) => normalizeAdjustment(v, key))
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
   plan.incomes = entriesOf(raw.incomes)
     .map(([key, v]) => normalizeIncome(v, key))
     .filter(Boolean)

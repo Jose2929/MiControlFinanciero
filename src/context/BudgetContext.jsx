@@ -5,17 +5,21 @@ import { MEDIO_ORDER, createEmptyPlan, getCycleForDate } from '../lib/budget'
 import {
   coerceSettingValue,
   nextOrder,
+  normalizeAdjustment,
   normalizeIncome,
   normalizeLine,
   normalizePlan,
 } from '../lib/budgetPlan'
 import {
+  deleteAdjustment,
   deleteIncome,
   deleteLine,
   newBudgetId,
   replacePlan,
   subscribeBudget,
   writeAccountMedios,
+  writeAdjustment,
+  writeCategoryEnvelope,
   writeIncome,
   writeLine,
   writeSettings,
@@ -114,9 +118,17 @@ export function BudgetProvider({ children }) {
 
   const removeLine = useCallback(
     (lineId) => {
-      if (householdId) run(deleteLine(householdId, uid, lineId))
+      if (!householdId) return
+      // Las ligas categoría → sobre que apuntaban a este renglón se quitan con él.
+      const links = []
+      for (const [medio, byCategory] of Object.entries(plan.categoryEnvelopes)) {
+        for (const [categoryId, id] of Object.entries(byCategory)) {
+          if (id === lineId) links.push({ medio, categoryId })
+        }
+      }
+      run(deleteLine(householdId, uid, lineId, links))
     },
-    [householdId, uid, run]
+    [householdId, uid, plan.categoryEnvelopes, run]
   )
 
   const saveIncome = useCallback(
@@ -148,6 +160,35 @@ export function BudgetProvider({ children }) {
     [householdId, uid, run]
   )
 
+  // lineId null = quitar la liga.
+  const setCategoryEnvelope = useCallback(
+    (medio, categoryId, lineId) => {
+      if (!householdId || !MEDIO_ORDER.includes(medio) || !categoryId) return
+      run(writeCategoryEnvelope(householdId, uid, medio, categoryId, lineId || null))
+    },
+    [householdId, uid, run]
+  )
+
+  // { envelopeId, amount (con signo), date 'AAAA-MM-DD', note }
+  const addAdjustment = useCallback(
+    (input) => {
+      if (!householdId) return
+      const adjustment = normalizeAdjustment(
+        { ...input, id: newBudgetId(householdId, 'adjustments'), createdBy: uid },
+        ''
+      )
+      if (adjustment) run(writeAdjustment(householdId, uid, adjustment))
+    },
+    [householdId, uid, run]
+  )
+
+  const removeAdjustment = useCallback(
+    (adjustmentId) => {
+      if (householdId) run(deleteAdjustment(householdId, uid, adjustmentId))
+    },
+    [householdId, uid, run]
+  )
+
   const importPlan = useCallback(
     (nextPlan) => {
       if (householdId) run(replacePlan(householdId, uid, nextPlan))
@@ -170,6 +211,9 @@ export function BudgetProvider({ children }) {
       saveIncome,
       removeIncome,
       setAccountMedios,
+      setCategoryEnvelope,
+      addAdjustment,
+      removeAdjustment,
       importPlan,
     }),
     [
@@ -184,6 +228,9 @@ export function BudgetProvider({ children }) {
       saveIncome,
       removeIncome,
       setAccountMedios,
+      setCategoryEnvelope,
+      addAdjustment,
+      removeAdjustment,
       importPlan,
     ]
   )

@@ -150,6 +150,45 @@ describe('Sobres — gastos sin sobre', () => {
   })
 })
 
+describe('Sobres — conectado con las categorías', () => {
+  it('un gasto sin sobre elegido resta del sobre ligado a su categoría, sin pedir clasificarlo', () => {
+    const plan = makePlan({ categoryEnvelopes: { debito: { comida: 'd-mand' } } })
+    const html = render({ plan, transactions: [tx(undefined, 200)] })
+    expect(html).toContain('Gastado $200 de $1,500')
+    expect(html).not.toContain('Gastos sin sobre')
+  })
+
+  it('sin liga para esa categoría, el gasto sí queda por clasificar', () => {
+    const plan = makePlan({ categoryEnvelopes: { debito: { entretenimiento: 'd-ocio' } } })
+    const html = render({ plan, transactions: [tx(undefined, 200)] })
+    expect(html).toContain('Gastos sin sobre')
+    expect(html).toContain('Gastado $0 de $1,500')
+  })
+})
+
+describe('Sobres — contar el sobre', () => {
+  it('cada sobre y bolsillo del ciclo actual ofrece "Contar"', () => {
+    const html = render()
+    for (const name of ['Mandado', 'Entretenimiento', 'Croquetas', 'Fondo', 'Bolsillo Anual']) {
+      expect(html).toContain(`aria-label="Contar ${name}"`)
+    }
+  })
+
+  it('un ajuste se ve en el sobre y en el resumen', () => {
+    const today = new Date()
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const plan = makePlan({ adjustments: [{ id: 'a1', envelopeId: 'd-mand', amount: -300, date }] })
+    const html = render({ plan })
+    expect(html).toContain('Ajuste −$300') // en el detalle del sobre
+    expect(html).toContain('Ajustes −$300') // en el resumen
+    expect(html).toContain('$1,200') // 1500 − 300
+  })
+
+  it('sin ajustes no aparece la palabra "Ajuste" en las tarjetas', () => {
+    expect(render()).not.toContain('Ajuste')
+  })
+})
+
 describe('Sobres — sobregiro y avisos', () => {
   it('avisa cuando un sobre ya se pasó de lo disponible', () => {
     const html = render({ transactions: [tx('d-ocio', 1000)] })

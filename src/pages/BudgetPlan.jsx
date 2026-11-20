@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { AccountsCard } from '../components/budget/AccountsCard'
 import { BalanceCard } from '../components/budget/BalanceCard'
+import { CategoryLinksCard } from '../components/budget/CategoryLinksCard'
 import { IncomesCard } from '../components/budget/IncomesCard'
 import { MedioCard } from '../components/budget/MedioCard'
 import { SettingsCard } from '../components/budget/SettingsCard'
@@ -20,9 +21,18 @@ import { PlanIncomeModal } from '../components/modals/PlanIncomeModal'
 // Presupuesto › Plan: ingresos, fechas y la tabla completa agrupada por medio,
 // con la verificación de que cuadra.
 export default function BudgetPlan() {
-  const { status, plan, hasPlan, writeError, clearWriteError, updateSettings, setAccountMedios, importPlan } =
-    useBudget()
-  const { accounts } = useFinance()
+  const {
+    status,
+    plan,
+    hasPlan,
+    writeError,
+    clearWriteError,
+    updateSettings,
+    setAccountMedios,
+    setCategoryEnvelope,
+    importPlan,
+  } = useBudget()
+  const { accounts, allCategories } = useFinance()
   const [manual, setManual] = useState(false) // armar el plan a mano en vez de importarlo
   const [lineMode, setLineMode] = useState(null)
   const [incomeMode, setIncomeMode] = useState(null)
@@ -108,6 +118,8 @@ export default function BudgetPlan() {
       ))}
 
       <AccountsCard accounts={accounts} accountMedios={plan.accountMedios} onChange={setAccountMedios} />
+
+      <CategoryLinksCard plan={plan} categories={allCategories} onChange={setCategoryEnvelope} />
 
       <SettingsCard settings={plan.settings} onChange={updateSettings} />
 

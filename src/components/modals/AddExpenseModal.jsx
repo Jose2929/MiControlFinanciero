@@ -282,9 +282,11 @@ export function AddExpenseModal({ open, onClose }) {
             </Select>
             {!envelopeTouched && suggestion && (
               <p className="mt-1 text-xs text-muted">
-                {suggestion.reason === 'history'
-                  ? 'Sugerido según tus gastos anteriores en esta categoría.'
-                  : 'Sugerido porque se llama igual que la categoría.'}
+                {suggestion.reason === 'rule'
+                  ? 'Sobre ligado a esta categoría.'
+                  : suggestion.reason === 'history'
+                    ? 'Sugerido según tus gastos anteriores en esta categoría.'
+                    : 'Sugerido porque se llama igual que la categoría.'}
               </p>
             )}
           </div>

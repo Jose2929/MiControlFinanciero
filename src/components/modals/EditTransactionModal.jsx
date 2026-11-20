@@ -5,7 +5,7 @@ import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { useFinance } from '../../context/FinanceContext'
 import { useBudget } from '../../context/BudgetContext'
-import { envelopeOptions } from '../../lib/budgetEnvelopes'
+import { envelopeOptions, getAccountMedio, ruleEnvelopeFor } from '../../lib/budgetEnvelopes'
 import { toDateInputValue } from '../../lib/format'
 
 // Edita o elimina una transacción ya registrada — gasto normal o pago de
@@ -40,6 +40,11 @@ export function EditTransactionModal({ transaction, onClose }) {
   const showEnvelope = envelopeChoices.length > 0
   // Un sobre que no es de este medio (p. ej. al cambiar de cuenta) no aplica.
   const selectedEnvelope = envelopeChoices.some((line) => line.id === envelopeId) ? envelopeId : ''
+  // Sin sobre elegido a mano, el gasto resta del sobre ligado a su categoría
+  // (si lo hay) — se dice en la primera opción para que no sorprenda.
+  const ruledLine = showEnvelope
+    ? envelopeChoices.find((line) => line.id === ruleEnvelopeFor(plan, getAccountMedio(plan, accountId), categoryId))
+    : null
 
   useEffect(() => {
     if (!transaction) return
@@ -140,7 +145,7 @@ export function EditTransactionModal({ transaction, onClose }) {
             value={selectedEnvelope}
             onChange={(e) => setEnvelopeId(e.target.value)}
           >
-            <option value="">Sin sobre</option>
+            <option value="">{ruledLine ? `Según la categoría (${ruledLine.name})` : 'Sin sobre'}</option>
             {envelopeChoices.map((line) => (
               <option key={line.id} value={line.id}>
                 {line.name}

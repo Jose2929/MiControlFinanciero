@@ -7,7 +7,7 @@ import { AdjustmentHistory } from '../budget/AdjustmentHistory'
 import { useBudget } from '../../context/BudgetContext'
 import { useFinance } from '../../context/FinanceContext'
 import { reconcileEnvelope } from '../../lib/budgetBalances'
-import { toDateInputValue } from '../../lib/format'
+import { formatShortDate, parseDateInputValue, toDateInputValue } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { money } from '../budget/money'
 
@@ -15,8 +15,11 @@ import { money } from '../budget/money'
 // diferencia se puede (1) corregir solo en el sobre, sin tocar tus cuentas, o
 // (2) registrar como un gasto olvidado, que además baja la cuenta.
 //
-// item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo actual.
-export function AdjustEnvelopeModal({ item, onClose }) {
+// item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo en pantalla.
+// date: fecha con la que se anota el ajuste (AAAA-MM-DD); hoy si no se indica.
+// allowExpense: false en un ciclo que aún no empieza, donde un gasto (que lleva su
+// fecha real) no contaría en este sobre.
+export function AdjustEnvelopeModal({ item, onClose, date, allowExpense = true }) {
   const { plan, addAdjustment } = useBudget()
   const { accounts, addExpense } = useFinance()
 
@@ -44,7 +47,9 @@ export function AdjustEnvelopeModal({ item, onClose }) {
   if (!item) return null
 
   const rec = reconcileEnvelope({ balance: item.balance, actual })
-  const canRegisterAsExpense = rec?.kind === 'missing' && mediAccounts.length > 0
+  const todayValue = toDateInputValue(new Date())
+  const entryDate = date || todayValue
+  const canRegisterAsExpense = allowExpense && rec?.kind === 'missing' && mediAccounts.length > 0
   const effectiveMode = rec?.kind === 'missing' && mode === 'expense' && canRegisterAsExpense ? 'expense' : 'adjust'
 
   function handleSubmit(e) {
@@ -65,7 +70,7 @@ export function AdjustEnvelopeModal({ item, onClose }) {
       addAdjustment({
         envelopeId: item.line.id,
         amount: rec.difference,
-        date: toDateInputValue(new Date()),
+        date: entryDate,
         note: note.trim() || 'Conteo del sobre',
       })
     }
@@ -121,9 +126,11 @@ export function AdjustEnvelopeModal({ item, onClose }) {
               {
                 id: 'expense',
                 title: 'Fue un gasto que olvidé registrar',
-                text: canRegisterAsExpense
-                  ? 'Lo registra como gasto: baja el sobre y también la cuenta.'
-                  : 'No hay una cuenta ligada a este medio (se asigna en Plan).',
+                text: !allowExpense
+                  ? 'Este ciclo aún no empieza: un gasto de hoy no cuenta en este sobre.'
+                  : canRegisterAsExpense
+                    ? 'Lo registra como gasto: baja el sobre y también la cuenta.'
+                    : 'No hay una cuenta ligada a este medio (se asigna en Plan).',
                 disabled: !canRegisterAsExpense,
               },
             ].map((option) => (
@@ -155,6 +162,12 @@ export function AdjustEnvelopeModal({ item, onClose }) {
               </Select>
             )}
           </div>
+        )}
+
+        {rec && rec.kind !== 'none' && effectiveMode === 'adjust' && entryDate !== todayValue && (
+          <p className="text-xs text-muted">
+            Se anota con fecha del {formatShortDate(parseDateInputValue(entryDate))}, cuando empieza este ciclo.
+          </p>
         )}
 
         {rec && rec.kind !== 'none' && (

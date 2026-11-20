@@ -13,10 +13,11 @@ import { formatMoney, toDateInputValue } from '../../lib/format'
 
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
+// `notice` es un aviso opcional que se muestra arriba del formulario.
 // `preset` ({ accountId, envelopeId }) abre el formulario con la cuenta y el
 // sobre ya elegidos; se lee al montar, así que quien lo use debe montarlo solo
 // mientras está abierto (como hace la pantalla de Sobres).
-export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar gasto' }) {
+export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar gasto', notice }) {
   const { allCategories, accounts, transactions, addExpense, addExpenseDeferred } = useFinance()
   const { plan, status: budgetStatus } = useBudget()
   const [amount, setAmount] = useState('')
@@ -171,6 +172,12 @@ export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar
   return (
     <Modal open={open} onClose={handleClose} title={title}>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {notice && (
+          <p role="note" className="rounded-xl border border-warning/40 bg-warning-soft p-3 text-xs text-ink">
+            {notice}
+          </p>
+        )}
+
         <div className="flex flex-col items-center gap-1 py-2">
           <span className="text-sm text-muted">Monto</span>
           <div className="flex items-center gap-1">

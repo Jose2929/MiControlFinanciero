@@ -202,17 +202,29 @@ describe('Sobres — agregar, gastar y ajustar', () => {
     expect(buttonTag(html, 'Ajustar Croquetas')).not.toContain('disabled=""')
   })
 
-  it('en un ciclo que aún no empieza los botones salen apagados y se explica por qué', () => {
+  it('en un ciclo que aún no empieza los botones siguen activos y se explica cómo cuenta cada cosa', () => {
     const next = shiftCycle(getCycleForDate(new Date(), 1), 1).key
     const html = render({ plan: makePlan({ settings: { cycleStartDay: 1, startCycle: next } }) })
     expect(html).toContain('Aún no empieza')
     expect(html).toContain('Este ciclo todavía no empieza.')
+    expect(html).toContain('cuenta desde que empieza el ciclo')
+    expect(html).toContain('uno de hoy no descuenta de estos sobres')
     expect(html).toContain('Plan → Fechas y ciclo')
     for (const name of NAMES) {
       for (const label of [`Agregar dinero a ${name}`, `Registrar gasto en ${name}`, `Ajustar ${name}`]) {
-        expect(buttonTag(html, label), label).toContain('disabled=""')
+        expect(buttonTag(html, label), label).not.toBe('')
+        expect(buttonTag(html, label), label).not.toContain('disabled=""')
       }
     }
+  })
+
+  it('en un ciclo futuro, un medio sin cuenta ligada sigue sin dejar registrar gasto', () => {
+    const next = shiftCycle(getCycleForDate(new Date(), 1), 1).key
+    const html = render({
+      plan: makePlan({ settings: { cycleStartDay: 1, startCycle: next }, accountMedios: { 'acc-deb': 'debito' } }),
+    })
+    expect(buttonTag(html, 'Registrar gasto en Croquetas')).toContain('disabled=""')
+    expect(buttonTag(html, 'Agregar dinero a Croquetas')).not.toContain('disabled=""')
   })
 
   it('en el ciclo en curso no sale el aviso de ciclo futuro', () => {

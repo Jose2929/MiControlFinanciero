@@ -5,7 +5,7 @@ import { Input } from '../ui/Input'
 import { AdjustmentHistory } from '../budget/AdjustmentHistory'
 import { useBudget } from '../../context/BudgetContext'
 import { movementAmount } from '../../lib/budgetBalances'
-import { toDateInputValue } from '../../lib/format'
+import { formatShortDate, parseDateInputValue, toDateInputValue } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { money } from '../budget/money'
 
@@ -23,8 +23,10 @@ const HELP = {
 // signo (así se ve en el historial y se puede deshacer); no registra un gasto
 // ni mueve tus cuentas.
 //
-// item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo actual.
-export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', onClose }) {
+// item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo en pantalla.
+// date: fecha con la que se anota (AAAA-MM-DD); hoy si no se indica. En un ciclo
+// que aún no empieza es el día en que empieza, para que cuente ahí.
+export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', date, onClose }) {
   const { addAdjustment } = useBudget()
   const [direction, setDirection] = useState(initialDirection)
   const [amount, setAmount] = useState('')
@@ -42,6 +44,8 @@ export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', o
 
   if (!item) return null
 
+  const todayValue = toDateInputValue(new Date())
+  const entryDate = date || todayValue
   const signed = movementAmount(direction, amount)
   const after = signed == null ? null : Math.round((item.balance + signed) * 100) / 100
   const verb = direction === 'in' ? 'Agregar' : 'Sacar'
@@ -54,7 +58,7 @@ export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', o
     addAdjustment({
       envelopeId: item.line.id,
       amount: signed,
-      date: toDateInputValue(new Date()),
+      date: entryDate,
       note: note.trim() || (direction === 'in' ? 'Dinero agregado' : 'Dinero retirado'),
     })
     onClose()
@@ -92,6 +96,11 @@ export function EnvelopeMoneyModal({ item, direction: initialDirection = 'in', o
           ))}
         </div>
         <p className="-mt-1 text-xs text-muted">{HELP[direction]}</p>
+        {entryDate !== todayValue && (
+          <p className="text-xs text-muted">
+            Se anota con fecha del {formatShortDate(parseDateInputValue(entryDate))}, cuando empieza este ciclo.
+          </p>
+        )}
 
         <Input
           label={direction === 'in' ? '¿Cuánto agregas?' : '¿Cuánto sacas?'}

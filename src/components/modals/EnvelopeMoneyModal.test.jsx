@@ -67,4 +67,14 @@ describe('EnvelopeMoneyModal', () => {
     expect(html).toContain('+$250')
     expect(html).toContain('aria-label="Quitar ajuste"')
   })
+
+  it('en un ciclo futuro avisa con qué fecha se anota; hoy o sin fecha, no dice nada', () => {
+    const future = render({ item, date: '2099-01-01' })
+    expect(future).toContain('Se anota con fecha del')
+    expect(future).toContain('cuando empieza este ciclo')
+    expect(render({ item })).not.toContain('Se anota con fecha')
+    const today = new Date()
+    const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    expect(render({ item, date: todayValue })).not.toContain('Se anota con fecha')
+  })
 })

@@ -17,7 +17,7 @@ import { AddExpenseModal } from '../components/modals/AddExpenseModal'
 import { AdjustEnvelopeModal } from '../components/modals/AdjustEnvelopeModal'
 import { EnvelopeMoneyModal } from '../components/modals/EnvelopeMoneyModal'
 import { money } from '../components/budget/money'
-import { formatShortDate, formatSignedMoney } from '../lib/format'
+import { formatShortDate, formatSignedMoney, toDateInputValue } from '../lib/format'
 import { cn } from '../lib/cn'
 
 function Section({ title, description, total, children }) {
@@ -130,13 +130,17 @@ export default function BudgetEnvelopes() {
   const fondo = items.filter((i) => i.line.kind === 'fondo')
   const pockets = items.filter((i) => i.line.kind === 'bolsillo')
   const noAccounts = Object.keys(plan.accountMedios).length === 0
-  // Agregar, gastar y ajustar solo valen en el ciclo en curso: en uno futuro se
-  // ven apagados (todavía no hay a qué aplicarlos) y en uno cerrado no se ofrecen.
+  // Agregar, gastar y ajustar valen en el ciclo en curso y también en uno que
+  // aún no empieza (para dejar listos los saldos iniciales); un ciclo cerrado
+  // es de solo lectura. Lo que se anota a mano en un ciclo futuro lleva la fecha
+  // en que ese ciclo empieza, así sí cuenta ahí; un gasto, en cambio, siempre
+  // lleva su fecha real (hoy), por eso en un ciclo futuro no descuenta del sobre.
+  const isFuture = result.progress.status === 'future'
+  const movementDate = toDateInputValue(isFuture ? cycle.start : new Date())
   const actionsFor = (item) =>
     result.isPast
       ? undefined
       : {
-          disabled: !result.isCurrent,
           onAdd: (it) => setMoving({ id: it.line.id, direction: 'in' }),
           onSpend: accountByMedio[item.line.medio] ? setSpending : undefined,
           onAdjust: setAdjusting,
@@ -157,8 +161,10 @@ export default function BudgetEnvelopes() {
         <Card className="p-4">
           <p className="text-sm text-ink">Este ciclo todavía no empieza.</p>
           <p className="mt-1 text-xs text-muted">
-            Desde el {formatShortDate(cycle.start)} podrás agregar dinero, registrar gastos y ajustar cada sobre desde aquí.
-            Para usarlo antes, cambia el ciclo de arranque en{' '}
+            Puedes agregar dinero a los sobres o ajustarlos desde ahora: se anota con fecha del{' '}
+            {formatShortDate(cycle.start)} y cuenta desde que empieza el ciclo. Los gastos llevan su fecha real, así que
+            uno de hoy no descuenta de estos sobres. Si prefieres que el presupuesto arranque antes, cambia el ciclo de
+            arranque en{' '}
             <Link to="/presupuesto/plan" className="font-medium text-brand-400 hover:text-brand-300">
               Plan → Fechas y ciclo
             </Link>
@@ -263,11 +269,14 @@ export default function BudgetEnvelopes() {
           así el saldo "según la app" siempre está al día. */}
       <AdjustEnvelopeModal
         item={adjusting ? items.find((i) => i.line.id === adjusting.line.id) || null : null}
+        date={movementDate}
+        allowExpense={!isFuture}
         onClose={() => setAdjusting(null)}
       />
       <EnvelopeMoneyModal
         item={moving ? items.find((i) => i.line.id === moving.id) || null : null}
         direction={moving?.direction}
+        date={movementDate}
         onClose={() => setMoving(null)}
       />
       {/* Se monta solo mientras está abierto: así arranca con la cuenta y el sobre ya elegidos. */}
@@ -276,6 +285,11 @@ export default function BudgetEnvelopes() {
           open
           title={`Gasto en ${spending.line.name}`}
           preset={{ accountId: accountByMedio[spending.line.medio], envelopeId: spending.line.id }}
+          notice={
+            isFuture
+              ? `Este ciclo arranca el ${formatShortDate(cycle.start)}. El gasto se guarda hoy en tus cuentas y en Registro, pero no descuenta de este sobre.`
+              : undefined
+          }
           onClose={() => setSpending(null)}
         />
       )}

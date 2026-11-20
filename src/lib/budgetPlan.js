@@ -139,6 +139,18 @@ export function normalizeSettings(raw) {
   return out
 }
 
+// -- Cuentas ↔ medios -------------------------------------------------------
+
+/** { [accountId]: medio } → solo pares con un medio válido. */
+export function normalizeAccountMedios(raw) {
+  const out = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+  for (const [accountId, medio] of Object.entries(raw)) {
+    if (MEDIO_ORDER.includes(medio)) out[accountId] = medio
+  }
+  return out
+}
+
 // -- Plan completo ----------------------------------------------------------
 
 /** Nodo crudo (RTDB, archivo importado o null) → plan limpio. Nunca lanza. */
@@ -146,6 +158,7 @@ export function normalizePlan(raw) {
   const plan = createEmptyPlan()
   if (!raw || typeof raw !== 'object') return plan
   plan.settings = normalizeSettings(raw.settings)
+  plan.accountMedios = normalizeAccountMedios(raw.accountMedios)
   plan.incomes = entriesOf(raw.incomes)
     .map(([key, v]) => normalizeIncome(v, key))
     .filter(Boolean)

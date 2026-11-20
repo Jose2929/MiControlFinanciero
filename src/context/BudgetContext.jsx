@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { useHousehold } from './HouseholdContext'
-import { createEmptyPlan } from '../lib/budget'
+import { MEDIO_ORDER, createEmptyPlan } from '../lib/budget'
 import {
   isValidSettingValue,
   nextOrder,
@@ -15,6 +15,7 @@ import {
   newBudgetId,
   replacePlan,
   subscribeBudget,
+  writeAccountMedios,
   writeIncome,
   writeLine,
   writeSettings,
@@ -59,7 +60,10 @@ export function BudgetProvider({ children }) {
       householdId,
       (raw) => setState({ status: 'ready', exists: raw != null, plan: normalizePlan(raw) }),
       (err) => {
-        console.error('No se pudo leer el presupuesto:', err)
+        // Mientras no se publique la regla del nodo, esto es lo esperado: se
+        // avisa en la pantalla Plan, no con un error en la consola de todas.
+        if (err?.code === 'PERMISSION_DENIED') console.warn('Presupuesto: Firebase aún no permite leer el nodo budget.')
+        else console.error('No se pudo leer el presupuesto:', err)
         setState({
           status: err?.code === 'PERMISSION_DENIED' ? 'denied' : 'error',
           plan: createEmptyPlan(),
@@ -127,6 +131,19 @@ export function BudgetProvider({ children }) {
     [householdId, uid, run]
   )
 
+  // patch: { [accountId]: medio | null }
+  const setAccountMedios = useCallback(
+    (patch) => {
+      if (!householdId) return
+      const clean = {}
+      for (const [accountId, medio] of Object.entries(patch)) {
+        if (medio === null || MEDIO_ORDER.includes(medio)) clean[accountId] = medio
+      }
+      if (Object.keys(clean).length > 0) run(writeAccountMedios(householdId, uid, clean))
+    },
+    [householdId, uid, run]
+  )
+
   const importPlan = useCallback(
     (nextPlan) => {
       if (householdId) run(replacePlan(householdId, uid, nextPlan))
@@ -148,6 +165,7 @@ export function BudgetProvider({ children }) {
       removeLine,
       saveIncome,
       removeIncome,
+      setAccountMedios,
       importPlan,
     }),
     [
@@ -161,6 +179,7 @@ export function BudgetProvider({ children }) {
       removeLine,
       saveIncome,
       removeIncome,
+      setAccountMedios,
       importPlan,
     ]
   )

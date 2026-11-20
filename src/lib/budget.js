@@ -58,8 +58,12 @@ export const DEFAULT_SETTINGS = {
   cashWithdrawalParts: 2,
 }
 
+// `accountMedios` liga cada cuenta de la app (por id) con su medio del
+// presupuesto: { 'acc-1001': 'tdc', ... }. Una cuenta que no aparece ahí queda
+// fuera del presupuesto. Es configuración del hogar, no parte del plan que se
+// exporta/importa.
 export function createEmptyPlan() {
-  return { version: 1, settings: { ...DEFAULT_SETTINGS }, incomes: [], lines: [] }
+  return { version: 1, settings: { ...DEFAULT_SETTINGS }, incomes: [], lines: [], accountMedios: {} }
 }
 
 // -- Dinero (centavos enteros) ----------------------------------------------

@@ -21,7 +21,9 @@ import {
   parseDateInputValue,
 } from '../lib/format'
 
-const FinanceContext = createContext(null)
+// Se exporta el contexto (no solo el hook) para poder probar pantallas con un
+// valor armado a mano, sin Firebase.
+export const FinanceContext = createContext(null)
 
 // Tiempo de inactividad antes de guardar solo, tras la última edición.
 const AUTOSAVE_DELAY_MS = 1500
@@ -672,7 +674,7 @@ export function FinanceProvider({ children, store: providedStore }) {
 
   // -- Actions --------------------------------------------------------
   const addExpense = useCallback(
-    ({ amount, categoryId, subcategoryId, accountId, counterAccountId, note, date }) => {
+    ({ amount, categoryId, subcategoryId, accountId, counterAccountId, envelopeId, note, date }) => {
       const tx = {
         id: nextLocalId('exp'),
         type: 'expense',
@@ -681,6 +683,9 @@ export function FinanceProvider({ children, store: providedStore }) {
         subcategoryId: subcategoryId || null,
         accountId,
         counterAccountId: counterAccountId || null,
+        // Sobre del presupuesto (id de una línea del plan). Opcional: sin él,
+        // el gasto simplemente queda "sin sobre".
+        envelopeId: envelopeId || null,
         note: note?.trim() || findCategoryLabel(categoryId),
         date: date ? parseDateInputValue(date) : new Date(),
         createdBy: authUser?.uid || null,

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { AlertCircle, SlidersHorizontal, X } from 'lucide-react'
 import { useBudget } from '../context/BudgetContext'
+import { useFinance } from '../context/FinanceContext'
 import { MEDIO_ORDER } from '../lib/budget'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
+import { AccountsCard } from '../components/budget/AccountsCard'
 import { BalanceCard } from '../components/budget/BalanceCard'
 import { IncomesCard } from '../components/budget/IncomesCard'
 import { MedioCard } from '../components/budget/MedioCard'
@@ -18,7 +20,9 @@ import { PlanIncomeModal } from '../components/modals/PlanIncomeModal'
 // Presupuesto › Plan: ingresos, fechas y la tabla completa agrupada por medio,
 // con la verificación de que cuadra.
 export default function BudgetPlan() {
-  const { status, plan, hasPlan, writeError, clearWriteError, updateSettings, importPlan } = useBudget()
+  const { status, plan, hasPlan, writeError, clearWriteError, updateSettings, setAccountMedios, importPlan } =
+    useBudget()
+  const { accounts } = useFinance()
   const [manual, setManual] = useState(false) // armar el plan a mano en vez de importarlo
   const [lineMode, setLineMode] = useState(null)
   const [incomeMode, setIncomeMode] = useState(null)
@@ -102,6 +106,8 @@ export default function BudgetPlan() {
           onEdit={(line) => setLineMode({ type: 'edit', line })}
         />
       ))}
+
+      <AccountsCard accounts={accounts} accountMedios={plan.accountMedios} onChange={setAccountMedios} />
 
       <SettingsCard settings={plan.settings} onChange={updateSettings} />
 

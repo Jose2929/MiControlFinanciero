@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import BudgetPlan from './BudgetPlan'
 import { BudgetContext } from '../context/BudgetContext'
+import { FinanceContext } from '../context/FinanceContext'
 import { createEmptyPlan } from '../lib/budget'
 import { normalizePlan } from '../lib/budgetPlan'
-import { fixturePlan } from '../lib/budgetFixtures'
+import { fixtureAccounts, fixturePlan } from '../lib/budgetFixtures'
 
 const noop = () => {}
 
-function render(overrides = {}, mutate) {
+function render(overrides = {}, mutate, accounts = fixtureAccounts()) {
   const plan = normalizePlan(fixturePlan())
   if (mutate) mutate(plan)
   const value = {
@@ -22,13 +23,16 @@ function render(overrides = {}, mutate) {
     removeLine: noop,
     saveIncome: noop,
     removeIncome: noop,
+    setAccountMedios: noop,
     importPlan: noop,
     ...overrides,
   }
   return renderToStaticMarkup(
-    <BudgetContext.Provider value={value}>
-      <BudgetPlan />
-    </BudgetContext.Provider>
+    <FinanceContext.Provider value={{ accounts }}>
+      <BudgetContext.Provider value={value}>
+        <BudgetPlan />
+      </BudgetContext.Provider>
+    </FinanceContext.Provider>
   )
 }
 
@@ -79,6 +83,42 @@ describe('Plan — plan que cuadra', () => {
     expect(html).toContain('Exportar plan')
     expect(html).toContain('Importar plan')
     expect(html).not.toContain('role="dialog"')
+  })
+})
+
+describe('Plan — cuentas de la app', () => {
+  it('lista cada cuenta con su tipo y los últimos 4 dígitos', () => {
+    const html = render()
+    expect(html).toContain('Cuentas de la app')
+    expect(html).toContain('Tarjeta A')
+    expect(html).toContain('Crédito · ••1234')
+    expect(html).toContain('Medio de Tarjeta A')
+    expect(html).toContain('Fuera del presupuesto')
+  })
+
+  it('con cuentas sin asignar ofrece sugerir, solo cuando no hay duda', () => {
+    // Tarjeta A (única de crédito), Débito A (única de débito, no es TDC2) y
+    // Efectivo (único) → 3 sugerencias.
+    expect(render()).toContain('Sugerir (3)')
+  })
+
+  it('marca la cuenta ya asignada y no vuelve a sugerirla', () => {
+    const html = render({}, (plan) => {
+      plan.accountMedios = { 'acc-cred': 'tdc', 'acc-deb': 'debito', 'acc-cash': 'efectivo' }
+    })
+    expect(html).not.toContain('Sugerir (')
+    expect(html).toMatch(/<option value="tdc" selected="">TDC<\/option>/)
+  })
+
+  it('avisa qué medios aún no tienen cuenta', () => {
+    const html = render({}, (plan) => {
+      plan.accountMedios = { 'acc-cred': 'tdc', 'acc-deb': 'debito', 'acc-cash': 'efectivo' }
+    })
+    expect(html).toContain('Aún no hay una cuenta para: TDC2, Ahorro')
+  })
+
+  it('sin cuentas registradas lo dice', () => {
+    expect(render({}, undefined, [])).toContain('Aún no tienes cuentas registradas')
   })
 })
 

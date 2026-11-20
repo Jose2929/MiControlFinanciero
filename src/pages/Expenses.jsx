@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Search, Receipt, X } from 'lucide-react'
 import { useFinance } from '../context/FinanceContext'
 import { useHousehold } from '../context/HouseholdContext'
+import { useBudget } from '../context/BudgetContext'
 import { Card } from '../components/ui/Card'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
@@ -18,6 +19,7 @@ import { cn } from '../lib/cn'
 export default function Expenses() {
   const { transactions, allCategories, accounts, findCategory } = useFinance()
   const { memberList } = useHousehold()
+  const { plan } = useBudget()
   // Filtros iniciales opcionales desde el drill-down de Presupuesto
   // (?category=&from=&to=) — solo se leen una vez, al montar.
   const [searchParams] = useSearchParams()
@@ -36,6 +38,8 @@ export default function Expenses() {
 
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a])), [accounts])
   const authorMap = useMemo(() => Object.fromEntries(memberList.map((m) => [m.uid, m])), [memberList])
+  // Nombre del sobre del presupuesto de cada gasto (si tiene uno asignado).
+  const envelopeNames = useMemo(() => Object.fromEntries(plan.lines.map((l) => [l.id, l.name])), [plan.lines])
 
   const expenses = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -207,6 +211,7 @@ export default function Expenses() {
                       category={findCategory(t.categoryId)}
                       subcategory={getSubcategory(t.categoryId, t.subcategoryId)}
                       account={accountMap[t.accountId]}
+                      sourceLabel={envelopeNames[t.envelopeId] ? `Sobre: ${envelopeNames[t.envelopeId]}` : undefined}
                       author={showAuthor ? authorMap[t.createdBy] : null}
                       onConvertToMsi={setConvertingTx}
                       onEdit={setEditingTx}

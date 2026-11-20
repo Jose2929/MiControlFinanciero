@@ -76,6 +76,14 @@ export function deleteIncome(householdId, uid, incomeId) {
   return commit({ ...stamp(householdId, uid), [`${basePath(householdId)}/incomes/${incomeId}`]: null })
 }
 
+/** `patch`: { [accountId]: medio | null } — null desliga la cuenta del presupuesto. */
+export function writeAccountMedios(householdId, uid, patch) {
+  const base = basePath(householdId)
+  const updates = stamp(householdId, uid)
+  for (const [accountId, medio] of Object.entries(patch)) updates[`${base}/accountMedios/${accountId}`] = medio
+  return commit(updates)
+}
+
 /**
  * Reemplaza ajustes, ingresos y líneas de una sola vez (importar un plan).
  * No toca otros hijos del nodo (p. ej. las casillas de la quincena).

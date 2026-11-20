@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { Toggle } from '../ui/Toggle'
 import { useFinance } from '../../context/FinanceContext'
+import { useBudget } from '../../context/BudgetContext'
+import { envelopeOptions, suggestEnvelope } from '../../lib/budgetEnvelopes'
 import { cn } from '../../lib/cn'
 import { categoryColorValue } from '../../lib/categories'
 import { formatMoney, toDateInputValue } from '../../lib/format'
@@ -12,7 +14,8 @@ import { formatMoney, toDateInputValue } from '../../lib/format'
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
 export function AddExpenseModal({ open, onClose }) {
-  const { allCategories, accounts, addExpense, addExpenseDeferred } = useFinance()
+  const { allCategories, accounts, transactions, addExpense, addExpenseDeferred } = useFinance()
+  const { plan, status: budgetStatus } = useBudget()
   const [amount, setAmount] = useState('')
   const [categoryId, setCategoryId] = useState(allCategories[0]?.id)
   const [subcategoryId, setSubcategoryId] = useState(null)
@@ -37,7 +40,43 @@ export function AddExpenseModal({ open, onClose }) {
   const category = allCategories.find((c) => c.id === categoryId)
   const effectiveMonths = customMonths ? Number(customMonths) : months
 
+  // -- Sobre del presupuesto ---------------------------------------------
+  // Solo aparece si la cuenta elegida está ligada a un medio del plan. Se
+  // preselecciona una sugerencia (historial o nombre) pero nunca se asigna sola:
+  // la persona la confirma o la cambia. Un pago de tarjeta o un gasto diferido
+  // a MSI no cuenta contra un sobre, así que ahí no se ofrece.
+  const [envelopeId, setEnvelopeId] = useState('')
+  const [envelopeTouched, setEnvelopeTouched] = useState(false)
+  const activeAccountId = accountId || accounts[0]?.id
+  const envelopeChoices = useMemo(
+    () => (budgetStatus === 'ready' ? envelopeOptions(plan, activeAccountId) : []),
+    [budgetStatus, plan, activeAccountId]
+  )
+  const showEnvelope = !deferred && !paysCard && envelopeChoices.length > 0
+  const suggestion = useMemo(
+    () =>
+      showEnvelope
+        ? suggestEnvelope({
+            plan,
+            accountId: activeAccountId,
+            categoryId,
+            categoryLabel: category?.label,
+            transactions,
+          })
+        : null,
+    [showEnvelope, plan, activeAccountId, categoryId, category?.label, transactions]
+  )
+  const suggestedId = suggestion?.lineId || ''
+
+  useEffect(() => {
+    if (!envelopeTouched) setEnvelopeId(suggestedId)
+    // Si cambió de cuenta a otro medio, el sobre elegido ya no aplica.
+    else if (envelopeId && !envelopeChoices.some((line) => line.id === envelopeId)) setEnvelopeId('')
+  }, [suggestedId, envelopeTouched, envelopeChoices, envelopeId])
+
   function reset() {
+    setEnvelopeId('')
+    setEnvelopeTouched(false)
     setAmount('')
     setCategoryId(allCategories[0]?.id)
     setSubcategoryId(null)
@@ -98,6 +137,7 @@ export function AddExpenseModal({ open, onClose }) {
         subcategoryId,
         accountId,
         counterAccountId: paysCard ? counterAccountId : null,
+        envelopeId: showEnvelope ? envelopeId || null : null,
         note,
         date,
       })
@@ -222,6 +262,33 @@ export function AddExpenseModal({ open, onClose }) {
             </option>
           ))}
         </Select>
+
+        {showEnvelope && (
+          <div>
+            <Select
+              label="Sobre del presupuesto (opcional)"
+              value={envelopeId}
+              onChange={(e) => {
+                setEnvelopeId(e.target.value)
+                setEnvelopeTouched(true)
+              }}
+            >
+              <option value="">Sin sobre</option>
+              {envelopeChoices.map((line) => (
+                <option key={line.id} value={line.id}>
+                  {line.name}
+                </option>
+              ))}
+            </Select>
+            {!envelopeTouched && suggestion && (
+              <p className="mt-1 text-xs text-muted">
+                {suggestion.reason === 'history'
+                  ? 'Sugerido según tus gastos anteriores en esta categoría.'
+                  : 'Sugerido porque se llama igual que la categoría.'}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Input label="Fecha" type="date" value={date} max={toDateInputValue(new Date())} onChange={(e) => setDate(e.target.value)} />

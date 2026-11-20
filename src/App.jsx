@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Wallet2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { HouseholdProvider, useHousehold } from './context/HouseholdContext'
@@ -47,14 +47,6 @@ function PublicOnly({ children }) {
   return children
 }
 
-function BudgetLayout() {
-  return (
-    <BudgetProvider>
-      <Outlet />
-    </BudgetProvider>
-  )
-}
-
 function AppRoutes() {
   return (
     <Routes>
@@ -70,7 +62,12 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <FinanceProvider>
-              <AppShell />
+              {/* El plan del presupuesto se escucha en toda la app (no solo en
+                  /presupuesto) porque el modal de gasto, que vive en Registro,
+                  también ofrece el selector de sobre. */}
+              <BudgetProvider>
+                <AppShell />
+              </BudgetProvider>
             </FinanceProvider>
           </RequireAuth>
         }
@@ -85,14 +82,11 @@ function AppRoutes() {
         <Route path="/notificaciones" element={<Notifications />} />
         <Route path="/perfil" element={<Profile />} />
         {/* Apartado Presupuesto: misma sesión, mismo FinanceProvider y mismo
-            botón de guardado que el resto de la app. El plan se escucha desde
-            su propio nodo de Firebase, y solo mientras estás en este apartado. */}
-        <Route element={<BudgetLayout />}>
-          <Route path="/presupuesto" element={<BudgetEnvelopes />} />
-          <Route path="/presupuesto/quincena" element={<BudgetFortnight />} />
-          <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
-          <Route path="/presupuesto/plan" element={<BudgetPlan />} />
-        </Route>
+            botón de guardado que el resto de la app. */}
+        <Route path="/presupuesto" element={<BudgetEnvelopes />} />
+        <Route path="/presupuesto/quincena" element={<BudgetFortnight />} />
+        <Route path="/presupuesto/calendario" element={<BudgetCalendar />} />
+        <Route path="/presupuesto/plan" element={<BudgetPlan />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

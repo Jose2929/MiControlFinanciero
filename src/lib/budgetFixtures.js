@@ -14,6 +14,15 @@ export const line = (id, medio, kind, amount, extra = {}) => ({
   ...extra,
 })
 
+// Cuentas de la app ficticias: una de crédito, una de débito y una de efectivo.
+export function fixtureAccounts() {
+  return [
+    { id: 'acc-cred', name: 'Tarjeta A', type: 'credito', last4: '1234', used: 0, limit: 10000 },
+    { id: 'acc-deb', name: 'Débito A', type: 'debito', last4: null, balance: 5000 },
+    { id: 'acc-cash', name: 'Efectivo', type: 'efectivo', last4: null, balance: 800 },
+  ]
+}
+
 export function fixturePlan() {
   return {
     version: 1,

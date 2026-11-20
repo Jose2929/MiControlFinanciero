@@ -49,8 +49,10 @@ export const DEFAULT_SETTINGS = {
   // Día en que arranca el ciclo de gasto diario. 1 = mes calendario; 15 = del
   // 15 al 14 del siguiente mes.
   cycleStartDay: 1,
-  cutDay: 3,
-  // Fecha límite de pago de la TDC (día del mes) — configurable.
+  // Día de corte de la TDC.
+  cutDay: 12,
+  // Fecha límite de pago de la TDC (día del mes). Si es menor o igual que el día
+  // de corte, es del mes siguiente (corte el 12, límite el 3 del otro mes).
   payDueDay: 3,
   // Día de sueldo en que se reparte lo de TDC2, débito y efectivo.
   spendTransferDay: 15,
@@ -69,9 +71,10 @@ export const DEFAULT_SETTINGS = {
 // `categoryEnvelopes` liga categorías con sobres, POR MEDIO:
 //   { debito: { comida: 'debito-mandado', '*': 'debito-gasolina' }, ... }
 // La clave '*' es "todo lo demás" de ese medio. `adjustments` son los conteos
-// físicos ("este sobre tiene en realidad $X"). Los tres —cuentas, ligas y
-// ajustes— son configuración e historial del hogar, no parte del plan que se
-// exporta/importa.
+// físicos ("este sobre tiene en realidad $X"). `checks` son las palomitas del
+// calendario: { 'AAAA-MM': { [clave del evento]: true } }. Los cuatro —cuentas,
+// ligas, ajustes y palomitas— son configuración e historial del hogar, no parte
+// del plan que se exporta/importa.
 export function createEmptyPlan() {
   return {
     version: 1,
@@ -81,6 +84,7 @@ export function createEmptyPlan() {
     accountMedios: {},
     categoryEnvelopes: {},
     adjustments: [],
+    checks: {},
   }
 }
 

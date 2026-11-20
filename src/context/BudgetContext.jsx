@@ -4,6 +4,8 @@ import { useHousehold } from './HouseholdContext'
 import { MEDIO_ORDER, createEmptyPlan, getCycleForDate } from '../lib/budget'
 import {
   coerceSettingValue,
+  isValidCheckKey,
+  isValidCycleKey,
   nextOrder,
   normalizeAdjustment,
   normalizeIncome,
@@ -20,6 +22,7 @@ import {
   writeAccountMedios,
   writeAdjustment,
   writeCategoryEnvelope,
+  writeCheck,
   writeIncome,
   writeLine,
   writeSettings,
@@ -98,6 +101,15 @@ export function BudgetProvider({ children }) {
       if (Object.keys(clean).length > 0) run(writeSettings(householdId, uid, clean))
     },
     [householdId, uid, plan.settings, run]
+  )
+
+  // Palomita del calendario: `monthKey` 'AAAA-MM', `eventKey` la clave del evento.
+  const setCheck = useCallback(
+    (monthKey, eventKey, checked) => {
+      if (!householdId || !isValidCycleKey(monthKey) || !isValidCheckKey(eventKey)) return
+      run(writeCheck(householdId, uid, monthKey, eventKey, Boolean(checked)))
+    },
+    [householdId, uid, run]
   )
 
   const saveLine = useCallback(
@@ -214,6 +226,7 @@ export function BudgetProvider({ children }) {
       setCategoryEnvelope,
       addAdjustment,
       removeAdjustment,
+      setCheck,
       importPlan,
     }),
     [
@@ -231,6 +244,7 @@ export function BudgetProvider({ children }) {
       setCategoryEnvelope,
       addAdjustment,
       removeAdjustment,
+      setCheck,
       importPlan,
     ]
   )

@@ -186,6 +186,26 @@ export function normalizeCategoryEnvelopes(raw) {
   return out
 }
 
+// -- Palomitas del calendario -------------------------------------------------
+
+/** Clave de un evento del calendario: solo letras, números, guion y guion bajo (válida como clave de Firebase). */
+export const isValidCheckKey = (key) => typeof key === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(key)
+
+/** { 'AAAA-MM': { clave: true } } → solo meses válidos y palomitas encendidas (lo apagado no se guarda). */
+export function normalizeChecks(raw) {
+  const out = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+  for (const [month, entries] of Object.entries(raw)) {
+    if (!isValidCycleKey(month) || !entries || typeof entries !== 'object' || Array.isArray(entries)) continue
+    const clean = {}
+    for (const [key, value] of Object.entries(entries)) {
+      if (value === true && isValidCheckKey(key)) clean[key] = true
+    }
+    if (Object.keys(clean).length > 0) out[month] = clean
+  }
+  return out
+}
+
 // -- Ajustes de sobre (conteos físicos) -------------------------------------
 
 /** "2026-11-19" → true si es una fecha real. */
@@ -232,6 +252,7 @@ export function normalizePlan(raw) {
   plan.settings = normalizeSettings(raw.settings)
   plan.accountMedios = normalizeAccountMedios(raw.accountMedios)
   plan.categoryEnvelopes = normalizeCategoryEnvelopes(raw.categoryEnvelopes)
+  plan.checks = normalizeChecks(raw.checks)
   plan.adjustments = entriesOf(raw.adjustments)
     .map(([key, v]) => normalizeAdjustment(v, key))
     .filter(Boolean)

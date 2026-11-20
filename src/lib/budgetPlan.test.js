@@ -4,10 +4,12 @@ import { resolve } from 'node:path'
 import { DEFAULT_SETTINGS, checkBalance } from './budget'
 import { fixturePlan } from './budgetFixtures'
 import {
+  isValidCheckKey,
   isValidDay,
   isValidSettingValue,
   lineKindFor,
   nextOrder,
+  normalizeChecks,
   normalizeIncome,
   normalizeLine,
   normalizePlan,
@@ -187,6 +189,50 @@ describe('normalizePlan', () => {
   it('ignora renglones sin medio válido', () => {
     const plan = normalizePlan({ lines: [{ id: 'x', medio: 'banco', name: 'x', amount: 1 }, null, 5] })
     expect(plan.lines).toEqual([])
+  })
+})
+
+describe('palomitas del calendario', () => {
+  it('claves válidas: letras, números, guion y guion bajo', () => {
+    expect(isValidCheckKey('ing_a_15')).toBe(true)
+    expect(isValidCheckKey('cargo_tdc-netflix')).toBe(true)
+    for (const bad of ['', 'con.punto', 'con/raya', 'con espacio', 'a$b', null, 5, 'x'.repeat(121)]) {
+      expect(isValidCheckKey(bad), String(bad)).toBe(false)
+    }
+  })
+
+  it('normalizeChecks deja solo meses válidos y palomitas encendidas', () => {
+    const out = normalizeChecks({
+      '2026-12': { ing_a_15: true, pago_tdc: false, 'raro.key': true, otra: 'si' },
+      '2026-13': { x: true },
+      'diciembre': { x: true },
+      '2027-01': { corte_tdc: true },
+      '2027-02': {},
+      '2027-03': [true],
+    })
+    expect(out).toEqual({ '2026-12': { ing_a_15: true }, '2027-01': { corte_tdc: true } })
+  })
+
+  it('con datos que no son un objeto devuelve vacío', () => {
+    for (const raw of [null, undefined, 'x', 5, [], [{ a: 1 }]]) expect(normalizeChecks(raw)).toEqual({})
+  })
+
+  it('un plan normalizado siempre trae `checks`', () => {
+    expect(normalizePlan(null).checks).toEqual({})
+    expect(normalizePlan({}).checks).toEqual({})
+    expect(normalizePlan({ checks: { '2026-12': { ing_a_15: true } } }).checks).toEqual({ '2026-12': { ing_a_15: true } })
+  })
+
+  it('no van en lo que se guarda al importar un plan ni en el respaldo', () => {
+    const plan = normalizePlan({ ...fixturePlan(), checks: { '2026-12': { ing_a_15: true } } })
+    expect('checks' in planToTree(plan)).toBe(false)
+    expect('checks' in planToExport(plan)).toBe(false)
+  })
+
+  it('importar un plan no guarda palomitas aunque el archivo las incluya', () => {
+    const result = validatePlanInput(JSON.stringify({ ...fixturePlan(), checks: { '2026-12': { ing_a_15: true } } }))
+    expect(result.ok).toBe(true)
+    expect('checks' in planToTree(result.plan)).toBe(false)
   })
 })
 

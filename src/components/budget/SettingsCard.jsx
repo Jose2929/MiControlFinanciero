@@ -103,12 +103,14 @@ export function SettingsCard({ settings, onChange }) {
         <SettingField
           name="cutDay"
           label="Día de corte de la TDC"
+          hint="El día en que cierra el estado de cuenta."
           value={settings.cutDay}
           onCommit={onChange}
         />
         <SettingField
           name="payDueDay"
           label="Fecha límite de pago de la TDC (día)"
+          hint="Si es menor que el corte, es del mes siguiente (corte el 12, límite el 3 del otro mes)."
           value={settings.payDueDay}
           onCommit={onChange}
         />

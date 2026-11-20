@@ -12,6 +12,7 @@
 //     settings/  { cycleStartDay, cutDay, ... }
 //     incomes/   { [id]: {...} }
 //     lines/     { [id]: {...} }
+//     checks/    { ['AAAA-MM']: { [clave del evento]: true } }
 //
 // Requiere la regla "budget" de database.rules.json publicada en la consola de
 // Firebase (ver ese archivo).
@@ -89,6 +90,17 @@ export function writeAdjustment(householdId, uid, adjustment) {
 
 export function deleteAdjustment(householdId, uid, adjustmentId) {
   return commit({ ...stamp(householdId, uid), [`${basePath(householdId)}/adjustments/${adjustmentId}`]: null })
+}
+
+/**
+ * Enciende o apaga la palomita de un evento del calendario en un mes. Apagarla
+ * borra la clave (null) para no acumular falsos. Solo toca esa ruta.
+ */
+export function writeCheck(householdId, uid, monthKey, eventKey, checked) {
+  return commit({
+    ...stamp(householdId, uid),
+    [`${basePath(householdId)}/checks/${monthKey}/${eventKey}`]: checked ? true : null,
+  })
 }
 
 export function writeIncome(householdId, uid, income) {

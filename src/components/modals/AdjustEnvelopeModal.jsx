@@ -1,25 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
+import { AdjustmentHistory } from '../budget/AdjustmentHistory'
 import { useBudget } from '../../context/BudgetContext'
 import { useFinance } from '../../context/FinanceContext'
 import { reconcileEnvelope } from '../../lib/budgetBalances'
-import { formatShortDate, formatSignedMoney, parseDateInputValue, toDateInputValue } from '../../lib/format'
+import { toDateInputValue } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { money } from '../budget/money'
 
-const MAX_HISTORY = 5
-
-// Contar un sobre: "según la app tiene $X; en realidad tiene $Y". La
+// Ajustar un sobre (contarlo): "según la app tiene $X; en realidad tiene $Y". La
 // diferencia se puede (1) corregir solo en el sobre, sin tocar tus cuentas, o
 // (2) registrar como un gasto olvidado, que además baja la cuenta.
 //
 // item: elemento de computeEnvelopes ({ line, balance, ... }) del ciclo actual.
 export function AdjustEnvelopeModal({ item, onClose }) {
-  const { plan, addAdjustment, removeAdjustment } = useBudget()
+  const { plan, addAdjustment } = useBudget()
   const { accounts, addExpense } = useFinance()
 
   const [actual, setActual] = useState('')
@@ -33,17 +31,6 @@ export function AdjustEnvelopeModal({ item, onClose }) {
     () => (medio ? accounts.filter((a) => plan.accountMedios[a.id] === medio) : []),
     [accounts, plan.accountMedios, medio]
   )
-  const history = useMemo(
-    () =>
-      item
-        ? plan.adjustments
-            .filter((a) => a.envelopeId === item.line.id)
-            .slice(-MAX_HISTORY)
-            .reverse()
-        : [],
-    [plan.adjustments, item]
-  )
-
   useEffect(() => {
     if (!item) return
     setActual('')
@@ -86,7 +73,7 @@ export function AdjustEnvelopeModal({ item, onClose }) {
   }
 
   return (
-    <Modal open onClose={onClose} title={`Contar ${item.line.name}`}>
+    <Modal open onClose={onClose} title={`Ajustar ${item.line.name}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-xl border border-line bg-surface2 p-4">
           <p className="text-xs text-muted">Según la app tiene</p>
@@ -183,38 +170,7 @@ export function AdjustEnvelopeModal({ item, onClose }) {
           {rec?.kind === 'none' ? 'Listo, coincide' : effectiveMode === 'expense' ? 'Registrar gasto' : 'Actualizar sobre'}
         </Button>
 
-        {history.length > 0 && (
-          <div className="border-t border-line pt-4">
-            <p className="mb-1 text-xs font-medium text-muted">Ajustes anteriores de este sobre</p>
-            <ul className="divide-y divide-line">
-              {history.map((adjustment) => (
-                <li key={adjustment.id} className="flex items-center gap-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-ink">{adjustment.note || 'Conteo del sobre'}</p>
-                    <p className="text-xs text-muted">{formatShortDate(parseDateInputValue(adjustment.date))}</p>
-                  </div>
-                  <span
-                    className={cn(
-                      'shrink-0 text-sm font-semibold tabular-nums',
-                      adjustment.amount < 0 ? 'text-negative' : 'text-positive'
-                    )}
-                  >
-                    {formatSignedMoney(adjustment.amount, { cents: !Number.isInteger(adjustment.amount) })}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeAdjustment(adjustment.id)}
-                    aria-label="Quitar ajuste"
-                    title="Quitar ajuste"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-negative-soft hover:text-negative"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <AdjustmentHistory envelopeId={item.line.id} />
       </form>
     </Modal>
   )

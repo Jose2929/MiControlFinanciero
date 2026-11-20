@@ -13,13 +13,16 @@ import { formatMoney, toDateInputValue } from '../../lib/format'
 
 const MONTH_OPTIONS = [3, 6, 9, 12]
 
-export function AddExpenseModal({ open, onClose }) {
+// `preset` ({ accountId, envelopeId }) abre el formulario con la cuenta y el
+// sobre ya elegidos; se lee al montar, así que quien lo use debe montarlo solo
+// mientras está abierto (como hace la pantalla de Sobres).
+export function AddExpenseModal({ open, onClose, preset = null, title = 'Agregar gasto' }) {
   const { allCategories, accounts, transactions, addExpense, addExpenseDeferred } = useFinance()
   const { plan, status: budgetStatus } = useBudget()
   const [amount, setAmount] = useState('')
   const [categoryId, setCategoryId] = useState(allCategories[0]?.id)
   const [subcategoryId, setSubcategoryId] = useState(null)
-  const [accountId, setAccountId] = useState(accounts[0]?.id)
+  const [accountId, setAccountId] = useState(preset?.accountId || accounts[0]?.id)
   const [note, setNote] = useState('')
   const [date, setDate] = useState(toDateInputValue(new Date()))
   const [error, setError] = useState('')
@@ -45,8 +48,8 @@ export function AddExpenseModal({ open, onClose }) {
   // preselecciona una sugerencia (historial o nombre) pero nunca se asigna sola:
   // la persona la confirma o la cambia. Un pago de tarjeta o un gasto diferido
   // a MSI no cuenta contra un sobre, así que ahí no se ofrece.
-  const [envelopeId, setEnvelopeId] = useState('')
-  const [envelopeTouched, setEnvelopeTouched] = useState(false)
+  const [envelopeId, setEnvelopeId] = useState(preset?.envelopeId || '')
+  const [envelopeTouched, setEnvelopeTouched] = useState(Boolean(preset?.envelopeId))
   const activeAccountId = accountId || accounts[0]?.id
   const envelopeChoices = useMemo(
     () => (budgetStatus === 'ready' ? envelopeOptions(plan, activeAccountId) : []),
@@ -166,7 +169,7 @@ export function AddExpenseModal({ open, onClose }) {
   }, [deferred, amount, effectiveMonths, interestFree, monthlyRate])
 
   return (
-    <Modal open={open} onClose={handleClose} title="Agregar gasto">
+    <Modal open={open} onClose={handleClose} title={title}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex flex-col items-center gap-1 py-2">
           <span className="text-sm text-muted">Monto</span>

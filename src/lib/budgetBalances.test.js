@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { cycleFromKey, getCycleForDate, shiftCycle } from './budget'
-import { computeEnvelopes, cycleRange, cyclesBetween, findUnclassified, isEnvelopeLine } from './budgetBalances'
+import {
+  computeEnvelopes,
+  cycleRange,
+  cyclesBetween,
+  findUnclassified,
+  isEnvelopeLine,
+  movementAmount,
+} from './budgetBalances'
 import { normalizePlan } from './budgetPlan'
 import { line } from './budgetFixtures'
 import { toDateInputValue } from './format'
@@ -334,5 +341,25 @@ describe('findUnclassified', () => {
 
     const [none] = list([tx(day(2026, 11, 8), undefined, 10, { categoryId: 'otros' })])
     expect(none.suggestion).toBeNull()
+  })
+})
+
+describe('movementAmount — agregar o sacar dinero de un sobre', () => {
+  it('agregar suma y sacar resta', () => {
+    expect(movementAmount('in', '500')).toBe(500)
+    expect(movementAmount('out', '500')).toBe(-500)
+    expect(movementAmount('out', 120.5)).toBe(-120.5)
+  })
+
+  it('redondea a centavos', () => {
+    expect(movementAmount('in', '10.005')).toBe(10.01)
+    expect(movementAmount('out', '0.1')).toBe(-0.1)
+  })
+
+  it('lo que no es un monto válido da null', () => {
+    for (const raw of ['', '   ', null, undefined, 'abc', '0', 0, '-5', -5, '0.001', NaN, Infinity]) {
+      expect(movementAmount('in', raw)).toBeNull()
+      expect(movementAmount('out', raw)).toBeNull()
+    }
   })
 })

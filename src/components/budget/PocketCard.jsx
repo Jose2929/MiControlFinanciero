@@ -2,11 +2,12 @@ import { Card } from '../ui/Card'
 import { cn } from '../../lib/cn'
 import { targetPerPayment } from '../../lib/budget'
 import { formatSignedMoney } from '../../lib/format'
+import { EnvelopeActions } from './EnvelopeActions'
 import { FREQUENCY_LABELS, money } from './money'
 
 // Un bolsillo de TDC2 (Seguro Moto, Tenencia…): lo que se aparta cada mes se
 // acumula hasta que llega el cobro, y cuando se ocupa se descuenta de aquí.
-export function PocketCard({ item, onAdjust }) {
+export function PocketCard({ item, actions }) {
   const { line, assigned, spent, adjusted, balance } = item
   const target = targetPerPayment(line)
   const percent = target > 0 ? Math.max(0, Math.min((balance / target) * 100, 100)) : 0
@@ -26,16 +27,6 @@ export function PocketCard({ item, onAdjust }) {
           <p className={cn('text-lg font-bold tabular-nums', balance < 0 ? 'text-negative' : 'text-ink')}>
             {money(balance)}
           </p>
-          {onAdjust && (
-            <button
-              type="button"
-              onClick={() => onAdjust(item)}
-              aria-label={`Contar ${line.name}`}
-              className="text-xs font-medium text-brand-400 hover:text-brand-300"
-            >
-              Contar
-            </button>
-          )}
         </div>
       </div>
 
@@ -63,6 +54,8 @@ export function PocketCard({ item, onAdjust }) {
           {assigned === 0 && 'Todavía no acumula en este ciclo.'}
         </p>
       )}
+
+      {actions && <EnvelopeActions item={item} {...actions} className="mt-3" />}
     </Card>
   )
 }

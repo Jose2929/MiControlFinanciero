@@ -87,6 +87,22 @@ export function reconcileEnvelope({ balance, actual }) {
 }
 
 /**
+ * Monto con signo de un movimiento manual del sobre: agregar suma, sacar resta.
+ * Devuelve null si lo escrito no es un monto válido (vacío, cero, negativo, no
+ * numérico), así la pantalla no tiene que repetir esa validación.
+ *
+ * @param {'in' | 'out'} direction
+ */
+export function movementAmount(direction, raw) {
+  if (raw == null || (typeof raw === 'string' && raw.trim() === '')) return null
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) return null
+  const cents = Math.round(value * 100)
+  if (cents <= 0) return null
+  return (direction === 'out' ? -cents : cents) / 100
+}
+
+/**
  * Saldo de cada sobre/bolsillo en el ciclo `cycle` (con todo lo que arrastra
  * desde el ciclo de arranque).
  *

@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import BudgetEnvelopes from './BudgetEnvelopes'
+import { EnvelopeCard } from '../components/budget/EnvelopeCard'
 import { BudgetContext } from '../context/BudgetContext'
 import { FinanceContext } from '../context/FinanceContext'
-import { createEmptyPlan, getCycleForDate } from '../lib/budget'
+import { createEmptyPlan, getCycleForDate, shiftCycle } from '../lib/budget'
 import { normalizePlan } from '../lib/budgetPlan'
 import { line } from '../lib/budgetFixtures'
 
@@ -166,12 +167,76 @@ describe('Sobres — conectado con las categorías', () => {
   })
 })
 
-describe('Sobres — contar el sobre', () => {
-  it('cada sobre y bolsillo del ciclo actual ofrece "Contar"', () => {
+// Abre la etiqueta <button> con ese aria-label (para revisar si está apagado).
+const buttonTag = (html, label) => html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0] || ''
+
+describe('Sobres — agregar, gastar y ajustar', () => {
+  const NAMES = ['Mandado', 'Entretenimiento', 'Croquetas', 'Fondo', 'Bolsillo Anual']
+
+  it('cada sobre y bolsillo del ciclo actual ofrece Agregar, Gasto y Ajustar, ya activos', () => {
     const html = render()
-    for (const name of ['Mandado', 'Entretenimiento', 'Croquetas', 'Fondo', 'Bolsillo Anual']) {
-      expect(html).toContain(`aria-label="Contar ${name}"`)
+    for (const name of NAMES) {
+      for (const label of [`Agregar dinero a ${name}`, `Registrar gasto en ${name}`, `Ajustar ${name}`]) {
+        const tag = buttonTag(html, label)
+        expect(tag, label).not.toBe('')
+        expect(tag, label).not.toContain('disabled=""')
+      }
     }
+    expect(html).toContain('>Agregar<')
+    expect(html).toContain('>Gasto<')
+    expect(html).toContain('>Ajustar<')
+  })
+
+  it('no hay botones para los cargos de la TDC', () => {
+    expect(render()).not.toContain('Un cargo')
+    expect(render()).not.toContain('Agregar dinero a Un cargo')
+  })
+
+  it('un medio sin cuenta ligada no deja registrar gasto, pero sí agregar y ajustar', () => {
+    const html = render({ plan: makePlan({ accountMedios: { 'acc-deb': 'debito' } }) })
+    expect(buttonTag(html, 'Registrar gasto en Mandado')).not.toContain('disabled=""')
+    const croquetas = buttonTag(html, 'Registrar gasto en Croquetas')
+    expect(croquetas).toContain('disabled=""')
+    expect(croquetas).toContain('title="Liga una cuenta')
+    expect(buttonTag(html, 'Agregar dinero a Croquetas')).not.toContain('disabled=""')
+    expect(buttonTag(html, 'Ajustar Croquetas')).not.toContain('disabled=""')
+  })
+
+  it('en un ciclo que aún no empieza los botones salen apagados y se explica por qué', () => {
+    const next = shiftCycle(getCycleForDate(new Date(), 1), 1).key
+    const html = render({ plan: makePlan({ settings: { cycleStartDay: 1, startCycle: next } }) })
+    expect(html).toContain('Aún no empieza')
+    expect(html).toContain('Este ciclo todavía no empieza.')
+    expect(html).toContain('Plan → Fechas y ciclo')
+    for (const name of NAMES) {
+      for (const label of [`Agregar dinero a ${name}`, `Registrar gasto en ${name}`, `Ajustar ${name}`]) {
+        expect(buttonTag(html, label), label).toContain('disabled=""')
+      }
+    }
+  })
+
+  it('en el ciclo en curso no sale el aviso de ciclo futuro', () => {
+    expect(render()).not.toContain('Este ciclo todavía no empieza.')
+  })
+
+  it('una tarjeta de ciclo cerrado no trae botones', () => {
+    const closed = { status: 'past', daysLeft: 0, dayNumber: 30, totalDays: 30 }
+    const item = {
+      line: makePlan().lines[0],
+      opening: 0,
+      assigned: 1500,
+      spent: 200,
+      adjusted: 0,
+      balance: 1300,
+      expected: 1500,
+      paceDiff: -1300,
+      perWeek: 0,
+      status: 'ok',
+    }
+    const html = renderToStaticMarkup(<EnvelopeCard item={item} progress={closed} />)
+    expect(html).toContain('Cerró con')
+    expect(html).not.toContain('Agregar')
+    expect(html).not.toContain('Ajustar')
   })
 
   it('un ajuste se ve en el sobre y en el resumen', () => {
@@ -182,6 +247,15 @@ describe('Sobres — contar el sobre', () => {
     expect(html).toContain('Ajuste −$300') // en el detalle del sobre
     expect(html).toContain('Ajustes −$300') // en el resumen
     expect(html).toContain('$1,200') // 1500 − 300
+  })
+
+  it('un monto agregado a mano suma al sobre', () => {
+    const today = new Date()
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const plan = makePlan({ adjustments: [{ id: 'a2', envelopeId: 'd-mand', amount: 500, date }] })
+    const html = render({ plan })
+    expect(html).toContain('Ajuste +$500')
+    expect(html).toContain('$2,000') // 1500 + 500
   })
 
   it('sin ajustes no aparece la palabra "Ajuste" en las tarjetas', () => {

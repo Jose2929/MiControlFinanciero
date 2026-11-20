@@ -13,9 +13,11 @@ import { PocketCard } from '../components/budget/PocketCard'
 import { RulesNotice } from '../components/budget/RulesNotice'
 import { StartCycleCard } from '../components/budget/StartCycleCard'
 import { UnclassifiedCard } from '../components/budget/UnclassifiedCard'
+import { AddExpenseModal } from '../components/modals/AddExpenseModal'
 import { AdjustEnvelopeModal } from '../components/modals/AdjustEnvelopeModal'
+import { EnvelopeMoneyModal } from '../components/modals/EnvelopeMoneyModal'
 import { money } from '../components/budget/money'
-import { formatSignedMoney } from '../lib/format'
+import { formatShortDate, formatSignedMoney } from '../lib/format'
 import { cn } from '../lib/cn'
 
 function Section({ title, description, total, children }) {
@@ -46,7 +48,9 @@ export default function BudgetEnvelopes() {
   const { transactions, accounts, findCategory, updateTransaction } = useFinance()
   const today = useMemo(() => new Date(), [])
   const [back, setBack] = useState(0) // cuántos ciclos hacia atrás del último visible
-  const [adjusting, setAdjusting] = useState(null) // sobre que se está contando
+  const [adjusting, setAdjusting] = useState(null) // sobre que se está ajustando (contando)
+  const [moving, setMoving] = useState(null) // { id, direction } al agregar o sacar dinero
+  const [spending, setSpending] = useState(null) // sobre al que se le registra un gasto
 
   const range = useMemo(() => (hasPlan ? cycleRange(plan, today) : null), [hasPlan, plan, today])
   const cycleCount = useMemo(() => (range ? cyclesBetween(range.first, range.last).length : 0), [range])
@@ -68,6 +72,15 @@ export default function BudgetEnvelopes() {
     [plan, transactions, cycle, findCategory]
   )
   const accountNames = useMemo(() => Object.fromEntries(accounts.map((a) => [a.id, a.name])), [accounts])
+  // Primera cuenta ligada a cada medio: es la que se propone al registrar un gasto desde un sobre.
+  const accountByMedio = useMemo(() => {
+    const byMedio = {}
+    for (const account of accounts) {
+      const medio = plan.accountMedios[account.id]
+      if (medio && !byMedio[medio]) byMedio[medio] = account.id
+    }
+    return byMedio
+  }, [accounts, plan.accountMedios])
 
   if (status === 'loading') {
     return (
@@ -117,8 +130,17 @@ export default function BudgetEnvelopes() {
   const fondo = items.filter((i) => i.line.kind === 'fondo')
   const pockets = items.filter((i) => i.line.kind === 'bolsillo')
   const noAccounts = Object.keys(plan.accountMedios).length === 0
-  // Contar un sobre solo tiene sentido en el ciclo en curso.
-  const onAdjust = result.isCurrent ? setAdjusting : undefined
+  // Agregar, gastar y ajustar solo valen en el ciclo en curso: en uno futuro se
+  // ven apagados (todavía no hay a qué aplicarlos) y en uno cerrado no se ofrecen.
+  const actionsFor = (item) =>
+    result.isPast
+      ? undefined
+      : {
+          disabled: !result.isCurrent,
+          onAdd: (it) => setMoving({ id: it.line.id, direction: 'in' }),
+          onSpend: accountByMedio[item.line.medio] ? setSpending : undefined,
+          onAdjust: setAdjusting,
+        }
 
   return (
     <div className="space-y-5">
@@ -130,6 +152,20 @@ export default function BudgetEnvelopes() {
         onPrev={() => setBack((b) => Math.min(b + 1, cycleCount - 1))}
         onNext={() => setBack((b) => Math.max(b - 1, 0))}
       />
+
+      {result.progress.status === 'future' && (
+        <Card className="p-4">
+          <p className="text-sm text-ink">Este ciclo todavía no empieza.</p>
+          <p className="mt-1 text-xs text-muted">
+            Desde el {formatShortDate(cycle.start)} podrás agregar dinero, registrar gastos y ajustar cada sobre desde aquí.
+            Para usarlo antes, cambia el ciclo de arranque en{' '}
+            <Link to="/presupuesto/plan" className="font-medium text-brand-400 hover:text-brand-300">
+              Plan → Fechas y ciclo
+            </Link>
+            .
+          </p>
+        </Card>
+      )}
 
       {noAccounts && (
         <Card className="border-warning/40 p-4">
@@ -194,7 +230,7 @@ export default function BudgetEnvelopes() {
       {debito.length > 0 && (
         <Section title="Débito" description="Gasto diario" total={totalOf(debito)}>
           {debito.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} actions={actionsFor(item)} />
           ))}
         </Section>
       )}
@@ -202,7 +238,7 @@ export default function BudgetEnvelopes() {
       {efectivo.length > 0 && (
         <Section title="Efectivo" description="Lo que retiras del débito" total={totalOf(efectivo)}>
           {efectivo.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} actions={actionsFor(item)} />
           ))}
         </Section>
       )}
@@ -210,7 +246,7 @@ export default function BudgetEnvelopes() {
       {fondo.length > 0 && (
         <Section title="Fondo general" description="Para cualquier gasto" total={totalOf(fondo)}>
           {fondo.map((item) => (
-            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} onAdjust={onAdjust} />
+            <EnvelopeCard key={item.line.id} item={item} progress={result.progress} actions={actionsFor(item)} />
           ))}
         </Section>
       )}
@@ -218,17 +254,31 @@ export default function BudgetEnvelopes() {
       {pockets.length > 0 && (
         <Section title="Bolsillos de TDC2" description="Lo que apartas cada mes para cobros del año">
           {pockets.map((item) => (
-            <PocketCard key={item.line.id} item={item} onAdjust={onAdjust} />
+            <PocketCard key={item.line.id} item={item} actions={actionsFor(item)} />
           ))}
         </Section>
       )}
 
-      {/* El sobre que se cuenta se vuelve a buscar en el resultado actual, así
-          el saldo "según la app" siempre está al día. */}
+      {/* El sobre con el que se trabaja se vuelve a buscar en el resultado actual,
+          así el saldo "según la app" siempre está al día. */}
       <AdjustEnvelopeModal
         item={adjusting ? items.find((i) => i.line.id === adjusting.line.id) || null : null}
         onClose={() => setAdjusting(null)}
       />
+      <EnvelopeMoneyModal
+        item={moving ? items.find((i) => i.line.id === moving.id) || null : null}
+        direction={moving?.direction}
+        onClose={() => setMoving(null)}
+      />
+      {/* Se monta solo mientras está abierto: así arranca con la cuenta y el sobre ya elegidos. */}
+      {spending && (
+        <AddExpenseModal
+          open
+          title={`Gasto en ${spending.line.name}`}
+          preset={{ accountId: accountByMedio[spending.line.medio], envelopeId: spending.line.id }}
+          onClose={() => setSpending(null)}
+        />
+      )}
     </div>
   )
 }

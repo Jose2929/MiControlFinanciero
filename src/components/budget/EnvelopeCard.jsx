@@ -1,6 +1,7 @@
 import { Card } from '../ui/Card'
 import { cn } from '../../lib/cn'
 import { formatSignedMoney } from '../../lib/format'
+import { EnvelopeActions } from './EnvelopeActions'
 import { money } from './money'
 
 const FILL = { ok: 'bg-positive', warning: 'bg-warning', danger: 'bg-negative' }
@@ -41,8 +42,10 @@ function weeksText(daysLeft) {
 }
 
 // Un sobre de gasto (Débito, Efectivo o el Fondo General) en el ciclo elegido.
-// `onAdjust` (solo en el ciclo actual) abre el conteo físico del sobre.
-export function EnvelopeCard({ item, progress, onAdjust }) {
+// `actions` ({ onAdd, onSpend, onAdjust, disabled }) pone los botones de
+// agregar dinero, registrar gasto y ajustar; sin él (ciclos cerrados) la tarjeta
+// es de solo lectura.
+export function EnvelopeCard({ item, progress, actions }) {
   const { line, opening, assigned, spent, adjusted, balance, expected, paceDiff, perWeek, status } = item
   const isCurrent = progress.status === 'current'
   const isPast = progress.status === 'past'
@@ -64,16 +67,6 @@ export function EnvelopeCard({ item, progress, onAdjust }) {
           <p className={cn('text-lg font-bold tabular-nums', balance < 0 ? 'text-negative' : 'text-ink')}>
             {money(balance)}
           </p>
-          {onAdjust && (
-            <button
-              type="button"
-              onClick={() => onAdjust(item)}
-              aria-label={`Contar ${line.name}`}
-              className="text-xs font-medium text-brand-400 hover:text-brand-300"
-            >
-              Contar
-            </button>
-          )}
         </div>
       </div>
 
@@ -89,6 +82,8 @@ export function EnvelopeCard({ item, progress, onAdjust }) {
           {isCurrent && balance < 0 && <span className="text-negative">Ya te pasaste de lo disponible</span>}
         </div>
       </div>
+
+      {actions && <EnvelopeActions item={item} {...actions} className="mt-3" />}
     </Card>
   )
 }

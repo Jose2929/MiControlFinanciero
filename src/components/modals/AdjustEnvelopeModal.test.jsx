@@ -35,7 +35,7 @@ describe('AdjustEnvelopeModal', () => {
 
   it('muestra lo que dice la app y pide lo que hay de verdad', () => {
     const html = render({ item })
-    expect(html).toContain('Contar Mandado')
+    expect(html).toContain('Ajustar Mandado')
     expect(html).toContain('Según la app tiene')
     expect(html).toContain('$1,300')
     expect(html).toContain('¿Cuánto tiene realmente?')

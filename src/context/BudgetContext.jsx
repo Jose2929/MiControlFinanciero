@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { useHousehold } from './HouseholdContext'
-import { MEDIO_ORDER, createEmptyPlan } from '../lib/budget'
+import { MEDIO_ORDER, createEmptyPlan, getCycleForDate } from '../lib/budget'
 import {
-  isValidSettingValue,
+  coerceSettingValue,
   nextOrder,
   normalizeIncome,
   normalizeLine,
@@ -88,7 +88,8 @@ export function BudgetProvider({ children }) {
       // Solo valores válidos y que de verdad cambian.
       const clean = {}
       for (const [key, value] of Object.entries(patch)) {
-        if (isValidSettingValue(key, value) && Number(value) !== plan.settings[key]) clean[key] = Number(value)
+        const coerced = coerceSettingValue(key, value)
+        if (coerced !== undefined && coerced !== plan.settings[key]) clean[key] = coerced
       }
       if (Object.keys(clean).length > 0) run(writeSettings(householdId, uid, clean))
     },
@@ -98,10 +99,13 @@ export function BudgetProvider({ children }) {
   const saveLine = useCallback(
     (input) => {
       if (!householdId) return
+      const isNew = !input.id
       const line = normalizeLine({
         ...input,
         id: input.id || newBudgetId(householdId, 'lines'),
         order: input.order ?? nextOrder(plan.lines),
+        // Una línea nueva acumula desde el ciclo de hoy, no "hacia atrás".
+        since: isNew ? getCycleForDate(new Date(), plan.settings.cycleStartDay).key : input.since,
       })
       if (line) run(writeLine(householdId, uid, line))
     },

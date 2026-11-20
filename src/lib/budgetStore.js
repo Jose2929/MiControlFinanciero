@@ -91,10 +91,13 @@ export function writeAccountMedios(householdId, uid, patch) {
 export function replacePlan(householdId, uid, plan) {
   const base = basePath(householdId)
   const tree = planToTree(plan)
-  return commit({
+  const updates = {
     ...stamp(householdId, uid),
-    [`${base}/settings`]: tree.settings,
     [`${base}/incomes`]: tree.incomes,
     [`${base}/lines`]: tree.lines,
-  })
+  }
+  // Ajustes campo por campo (no el nodo entero): lo que el archivo no trae —
+  // como el ciclo de arranque ya elegido — se conserva.
+  for (const [key, value] of Object.entries(tree.settings)) updates[`${base}/settings/${key}`] = value
+  return commit(updates)
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '../ui/Card'
 import { Input } from '../ui/Input'
 import { getCycleForDate } from '../../lib/budget'
-import { SETTING_LIMITS, isValidSettingValue } from '../../lib/budgetPlan'
+import { SETTING_LIMITS, isValidCycleKey, isValidSettingValue } from '../../lib/budgetPlan'
 import { formatShortDate } from '../../lib/format'
 
 // Un número entero con su rango. Se guarda al salir del campo (o con Enter),
@@ -54,6 +54,33 @@ function SettingField({ name, label, hint, value, onCommit }) {
   )
 }
 
+// Mes en que empieza el primer ciclo que cuenta. Es un selector de mes; se
+// guarda en cuanto trae un valor completo y válido.
+function StartCycleField({ value, onCommit }) {
+  const [draft, setDraft] = useState(value || '')
+
+  useEffect(() => {
+    setDraft(value || '')
+  }, [value])
+
+  return (
+    <div className="sm:col-span-2">
+      <Input
+        label="El presupuesto empieza en el ciclo de"
+        type="month"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          if (isValidCycleKey(e.target.value)) onCommit({ startCycle: e.target.value })
+        }}
+      />
+      <p className="mt-1 text-xs text-muted">
+        Los sobres arrancan en $0 en ese ciclo y acumulan hacia adelante. Los gastos de antes no cuentan.
+      </p>
+    </div>
+  )
+}
+
 export function SettingsCard({ settings, onChange }) {
   const cycle = getCycleForDate(new Date(), settings.cycleStartDay)
 
@@ -72,6 +99,7 @@ export function SettingsCard({ settings, onChange }) {
           value={settings.cycleStartDay}
           onCommit={onChange}
         />
+        <StartCycleField value={settings.startCycle} onCommit={onChange} />
         <SettingField
           name="cutDay"
           label="Día de corte de la TDC"

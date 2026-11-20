@@ -55,6 +55,7 @@ export function PlanLineModal({ mode, onClose }) {
     saveLine({
       id: isEdit ? mode.line.id : undefined,
       order: isEdit ? mode.line.order : undefined,
+      since: isEdit ? mode.line.since : undefined,
       name: name.trim(),
       medio,
       amount: Number(amount),

@@ -56,6 +56,10 @@ export const DEFAULT_SETTINGS = {
   spendTransferDay: 15,
   // En cuántas partes se retira el efectivo del débito.
   cashWithdrawalParts: 2,
+  // Primer ciclo que cuenta para los sobres, como "AAAA-MM" (el mes en que
+  // EMPIEZA ese ciclo). Los saldos arrancan en $0 ahí y acumulan hacia
+  // adelante. null = aún no se elige (la pantalla Sobres lo pide).
+  startCycle: null,
 }
 
 // `accountMedios` liga cada cuenta de la app (por id) con su medio del
@@ -127,6 +131,13 @@ export function getCycleForDate(date = new Date(), startDay = DEFAULT_SETTINGS.c
   const startThisMonth = clampedDate(d.getFullYear(), d.getMonth(), normalizeStartDay(startDay))
   const month = d >= startThisMonth ? d.getMonth() : d.getMonth() - 1
   return buildCycle(d.getFullYear(), month, startDay)
+}
+
+/** Ciclo que lleva la clave "AAAA-MM" (el mes en que empieza), o null si la clave no es válida. */
+export function cycleFromKey(key, startDay = DEFAULT_SETTINGS.cycleStartDay) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(key || '')
+  if (!match) return null
+  return buildCycle(Number(match[1]), Number(match[2]) - 1, startDay)
 }
 
 // n = -1 → ciclo anterior, +1 → siguiente.

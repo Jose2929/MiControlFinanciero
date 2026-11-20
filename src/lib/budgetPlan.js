@@ -28,6 +28,13 @@ const SETTING_RANGES = {
 
 export const SETTING_LIMITS = SETTING_RANGES
 
+const CYCLE_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/** "2026-11" → true. Es la clave de un ciclo (mes en que empieza). */
+export function isValidCycleKey(value) {
+  return typeof value === 'string' && CYCLE_KEY.test(value)
+}
+
 const toNumber = (v) => (v == null || (typeof v === 'string' && v.trim() === '') ? NaN : Number(v))
 const roundCents = (n) => Math.round(n * 100) / 100
 
@@ -47,10 +54,17 @@ function parseDay(value) {
 }
 
 export function isValidSettingValue(key, value) {
+  if (key === 'startCycle') return isValidCycleKey(value)
   const range = SETTING_RANGES[key]
   if (!range) return false
   const n = toNumber(value)
   return Number.isInteger(n) && n >= range[0] && n <= range[1]
+}
+
+/** Valor listo para guardar (número entero o clave de ciclo), o undefined si no es válido. */
+export function coerceSettingValue(key, value) {
+  if (!isValidSettingValue(key, value)) return undefined
+  return key === 'startCycle' ? value : Number(value)
 }
 
 // Arreglo o mapa de objetos → [clave, valor, posición]. Ignora lo que no sea objeto.
@@ -109,6 +123,9 @@ export function normalizeLine(raw, fallbackId = '', fallbackOrder = 0) {
     payFrequency,
     isValve: raw.isValve === true,
     order: Number.isFinite(order) ? order : fallbackOrder,
+    // Ciclo desde el que la línea acumula (null = desde que empieza el
+    // presupuesto). Evita que una línea agregada después acumule "hacia atrás".
+    since: isValidCycleKey(raw.since) ? raw.since : null,
   }
 }
 
@@ -133,8 +150,9 @@ export function normalizeIncome(raw, fallbackId = '') {
 
 export function normalizeSettings(raw) {
   const out = { ...DEFAULT_SETTINGS }
-  for (const key of Object.keys(SETTING_RANGES)) {
-    if (isValidSettingValue(key, raw?.[key])) out[key] = Number(raw[key])
+  for (const key of [...Object.keys(SETTING_RANGES), 'startCycle']) {
+    const value = coerceSettingValue(key, raw?.[key])
+    if (value !== undefined) out[key] = value
   }
   return out
 }
@@ -183,6 +201,7 @@ export function lineToTree(line) {
     payFrequency: line.payFrequency ?? null,
     isValve: Boolean(line.isValve),
     order: line.order ?? 0,
+    since: line.since ?? null,
   }
 }
 
@@ -197,8 +216,12 @@ export function incomeToTree(income) {
 }
 
 export function planToTree(plan) {
+  // `startCycle` sin elegir no se guarda: así importar un plan no borra el
+  // ciclo de arranque que ya se había escogido.
+  const { startCycle, ...settings } = plan.settings
+  if (startCycle) settings.startCycle = startCycle
   return {
-    settings: { ...plan.settings },
+    settings,
     incomes: Object.fromEntries(plan.incomes.map((i) => [i.id, incomeToTree(i)])),
     lines: Object.fromEntries(plan.lines.map((l) => [l.id, lineToTree(l)])),
   }
@@ -262,6 +285,9 @@ export function validatePlanInput(input) {
           errors.push(`Ajuste "${key}" inválido: debe ser un entero del ${min} al ${max}.`)
         }
       }
+      if (data.settings.startCycle != null && !isValidCycleKey(data.settings.startCycle)) {
+        errors.push('Ajuste "startCycle" inválido: usa el formato AAAA-MM (p. ej. 2026-12).')
+      }
     }
   }
 
@@ -305,6 +331,9 @@ export function validatePlanInput(input) {
     }
     if (raw.medio === 'tdc2' && raw.kind === 'bolsillo' && !FREQUENCIES.includes(raw.payFrequency)) {
       errors.push(`${label}: un bolsillo necesita su frecuencia de cobro.`)
+    }
+    if (raw.since != null && !isValidCycleKey(raw.since)) {
+      errors.push(`${label}: "since" debe tener el formato AAAA-MM.`)
     }
     const id = safeId(raw.id || key)
     if (lineIds.has(id)) errors.push(`${label}: el id "${id}" está repetido.`)
